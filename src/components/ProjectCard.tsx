@@ -26,7 +26,7 @@ export function ProjectCard({
     <article className="pixel-card group flex flex-col overflow-hidden">
       {/* Thumbnail */}
       <Link
-        href={`/punks/${punkId}/${project.id}`}
+        href={`/${punkId}/${project.id}`}
         className="relative aspect-video overflow-hidden border-b-4 border-foreground bg-punk-blue"
       >
         <ProjectThumbnail
@@ -41,7 +41,7 @@ export function ProjectCard({
         <div className="mb-2 flex items-start justify-between gap-2">
           <h3 className="font-bold uppercase tracking-wide">
             <Link
-              href={`/punks/${punkId}/${project.id}`}
+              href={`/${punkId}/${project.id}`}
               className="hover:text-punk-pink"
             >
               {project.name}
@@ -73,7 +73,7 @@ export function ProjectCard({
         <div className="flex items-center gap-4 border-t-2 border-foreground pt-3">
           {showPunk && (
             <Link
-              href={`/punks/${punkId}`}
+              href={`/${punkId}`}
               className="text-xs font-bold uppercase tracking-wider hover:text-punk-blue"
             >
               #{punkId}

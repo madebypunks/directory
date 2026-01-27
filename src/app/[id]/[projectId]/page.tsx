@@ -69,7 +69,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         <section className="border-b-4 border-foreground bg-punk-blue">
           <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
             <Link
-              href={`/punks/${punkId}`}
+              href={`/${punkId}`}
               className="mb-6 inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-white/80 transition-colors hover:text-white"
             >
               ← Back to Punk #{punkId}
@@ -157,7 +157,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                 <div className="mt-6 flex items-center gap-6 text-sm text-white/60">
                   <span>Launched {formattedDate}</span>
                   <Link
-                    href={`/punks/${punkId}`}
+                    href={`/${punkId}`}
                     className="flex items-center gap-2 hover:text-white"
                   >
                     <PunkAvatar punkId={punkId} size={24} />
