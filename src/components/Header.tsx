@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { GITHUB_URL, SITE_NAME } from "@/lib/constants";
+import { SITE_NAME } from "@/lib/constants";
 
 export function Header() {
   return (
@@ -19,14 +19,12 @@ export function Header() {
           >
             Projects
           </Link>
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/add"
             className="pixel-btn px-4 py-2 text-xs"
           >
             + Add Project
-          </a>
+          </Link>
         </nav>
       </div>
     </header>
