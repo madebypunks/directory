@@ -1,7 +1,7 @@
 import { generateOGImage, generateNotFoundImage } from "@/lib/og-image";
 import { getPunkById } from "@/data/projects";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 export const alt = "Made by Punks";
 export const size = {
