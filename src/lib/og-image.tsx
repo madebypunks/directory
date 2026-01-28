@@ -25,7 +25,7 @@ interface ProjectOGImageProps {
 }
 
 function getPunkImageUrl(punkId: number) {
-  return `https://punks.art/api/punks/${punkId}?format=png&size=240&background=v2`;
+  return `https://www.larvalabs.com/cryptopunks/cryptopunk${punkId}.png`;
 }
 
 // Load Silkscreen font from Google Fonts
@@ -80,87 +80,94 @@ export async function generateOGImage(
             height: "100%",
             width: "100%",
             display: "flex",
-            alignItems: "stretch",
+            alignItems: "center",
             backgroundColor: COLORS.punkBlueDark,
+            padding: "50px",
+            gap: "50px",
           }}
         >
-          {/* Punk avatar area - lighter blue background */}
+          {/* Punk avatar area - square with lighter blue background */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               backgroundColor: COLORS.punkBlue,
-              padding: "60px",
+              width: "480px",
+              height: "480px",
               flexShrink: 0,
+              overflow: "hidden",
             }}
           >
             <img
               src={getPunkImageUrl(punkId)}
-              width={360}
-              height={360}
+              width={480}
+              height={480}
               style={{
+                objectFit: "cover",
                 imageRendering: "pixelated",
               }}
             />
           </div>
 
-          {/* Info on the right - darker blue background */}
+          {/* Info on the right - same height as image */}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
-              justifyContent: "center",
+              justifyContent: "space-between",
               flex: 1,
-              padding: "60px",
+              height: "480px",
             }}
           >
-            {/* Name - Pixel font */}
-            <div
-              style={{
-                display: "flex",
-                fontFamily: "Silkscreen",
-                fontSize: 64,
-                fontWeight: 400,
-                color: "white",
-                textTransform: "uppercase",
-                lineHeight: 1.1,
-              }}
-            >
-              {title}
+            {/* Top section: Name + Punk ID */}
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {/* Name - Pixel font, pink color */}
+              <div
+                style={{
+                  display: "flex",
+                  fontFamily: "Silkscreen",
+                  fontSize: 64,
+                  fontWeight: 400,
+                  color: COLORS.punkPink,
+                  textTransform: "uppercase",
+                  lineHeight: 1.1,
+                }}
+              >
+                {title}
+              </div>
+
+              {/* Punk ID */}
+              <div
+                style={{
+                  display: "flex",
+                  fontFamily: "Silkscreen",
+                  fontSize: 40,
+                  fontWeight: 400,
+                  color: "white",
+                  textTransform: "uppercase",
+                  marginTop: "8px",
+                  opacity: 0.6,
+                }}
+              >
+                #{punkId}
+              </div>
             </div>
 
-            {/* Punk ID */}
-            <div
-              style={{
-                display: "flex",
-                fontFamily: "Silkscreen",
-                fontSize: 32,
-                fontWeight: 400,
-                color: "white",
-                textTransform: "uppercase",
-                marginTop: "12px",
-                opacity: 0.6,
-              }}
-            >
-              #{punkId}
-            </div>
-
-            {/* Works count - clean, no border */}
+            {/* Middle section: Works count */}
             {projectCount !== undefined && projectCount > 0 && (
               <div
                 style={{
                   display: "flex",
                   alignItems: "flex-end",
-                  marginTop: "40px",
-                  gap: "12px",
+                  gap: "16px",
                 }}
               >
                 <span
                   style={{
                     display: "flex",
                     fontFamily: "Silkscreen",
-                    fontSize: 56,
+                    fontSize: 48,
                     fontWeight: 400,
                     color: "white",
                     lineHeight: 1,
@@ -172,13 +179,12 @@ export async function generateOGImage(
                   style={{
                     display: "flex",
                     fontFamily: "Silkscreen",
-                    fontSize: 28,
+                    fontSize: 40,
                     fontWeight: 400,
                     color: "white",
                     textTransform: "uppercase",
                     opacity: 0.7,
                     lineHeight: 1,
-                    paddingBottom: "4px",
                   }}
                 >
                   work{projectCount !== 1 ? "s" : ""}
@@ -186,16 +192,15 @@ export async function generateOGImage(
               </div>
             )}
 
-            {/* Made by Punks branding */}
+            {/* Bottom section: Made by Punks branding */}
             <div
               style={{
                 display: "flex",
                 fontFamily: "Silkscreen",
-                fontSize: 20,
+                fontSize: 32,
                 fontWeight: 400,
                 color: "white",
                 textTransform: "uppercase",
-                marginTop: "auto",
                 paddingTop: "40px",
                 opacity: 0.4,
               }}
