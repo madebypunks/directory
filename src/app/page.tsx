@@ -20,14 +20,11 @@ export default function HomePage() {
         <section className="bg-punk-blue relative overflow-hidden">
           {/* Pattern overlay could go here */}
           <div className="mx-auto max-w-7xl px-4 py-12 text-center sm:px-6 sm:py-16 lg:px-8 relative z-10">
-            <h1 className="font-pixel-custom text-2xl uppercase tracking-wider text-white sm:text-4xl lg:text-5xl drop-shadow-[4px_4px_0_rgba(0,0,0,0.3)]">
+            <h1 className="font-pixel-custom text-3xl uppercase tracking-wider text-white sm:text-5xl lg:text-6xl drop-shadow-[4px_4px_0_rgba(0,0,0,0.3)]">
               {SITE_NAME}
             </h1>
             <p className="mx-auto mt-4 text-lg font-medium text-white/90 font-mono">
               {SITE_TAGLINE}
-            </p>
-            <p className="mx-auto mt-2 max-w-xl text-base text-white/70">
-              No database. No backend. No gatekeepers. Just git.
             </p>
             
             <div className="mt-8 flex items-center justify-center gap-6">
