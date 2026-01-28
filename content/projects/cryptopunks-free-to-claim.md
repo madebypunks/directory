@@ -14,6 +14,11 @@ links:
 creators:
   - 4736
   - 98
+  - 6980
+  - 6529
+  - 1477
+  - 5955
+  - 6307
 thumbnail: /projects/cryptopunks-free-to-claim.jpg
 ---
 
