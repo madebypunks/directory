@@ -36,9 +36,18 @@ export function ProjectListItem({ project, collaborators, size = "compact" }: Pr
 
       {/* Content */}
       <div className="flex-1 min-w-0 flex flex-col justify-center">
-        <h3 className={`font-bold leading-tight group-hover:text-punk-pink transition-colors truncate ${isDefault ? 'text-lg sm:text-xl' : 'text-base sm:text-lg'}`}>
-          {project.name}
-        </h3>
+        {/* Title + Date row */}
+        <div className="flex items-baseline justify-between gap-4">
+          <h3 className={`font-bold leading-tight group-hover:text-punk-pink transition-colors truncate ${isDefault ? 'text-lg sm:text-xl' : 'text-base sm:text-lg'}`}>
+            {project.name}
+          </h3>
+          <time
+            dateTime={project.launchDate}
+            className="hidden sm:block text-base font-medium opacity-40 font-mono shrink-0"
+          >
+            {formattedDate}
+          </time>
+        </div>
 
         {/* Collaborators */}
         {collaborators && collaborators.length > 0 && (
@@ -58,16 +67,6 @@ export function ProjectListItem({ project, collaborators, size = "compact" }: Pr
         <p className={`mt-1 opacity-70 leading-snug ${isDefault ? 'text-sm sm:text-base line-clamp-2' : 'text-sm sm:text-base line-clamp-1 sm:line-clamp-2'}`}>
           {project.description}
         </p>
-      </div>
-
-      {/* Date */}
-      <div className="hidden sm:flex items-center shrink-0">
-        <time
-          dateTime={project.launchDate}
-          className="text-sm font-medium opacity-40 font-mono"
-        >
-          {formattedDate}
-        </time>
       </div>
     </Link>
   );

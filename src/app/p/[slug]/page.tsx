@@ -155,9 +155,9 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                 {/* Meta */}
                 <div className="mt-8 flex flex-wrap items-center gap-6 text-base text-white/60 font-mono">
                   <span>Launched {formattedDate}</span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-4">
                     <span>by</span>
-                    {creators.map((creator, i) => (
+                    {creators.map((creator) => (
                       <Link
                         key={creator.id}
                         href={`/${creator.id}`}
@@ -165,7 +165,6 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                       >
                         <PunkAvatar punkId={creator.id} size={24} className="border-0!" />
                         <span>{creator.name || `#${creator.id}`}</span>
-                        {i < creators.length - 1 && <span>,</span>}
                       </Link>
                     ))}
                   </div>
