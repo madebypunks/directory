@@ -11,21 +11,20 @@ export function PunkSection({ punks, projects }: PunkSectionProps) {
   return (
     <section className="py-8">
       {/* Punk Header */}
-      <div className="mb-6 flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-4 flex-wrap">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           {punks.map((punk, i) => (
             <div key={punk.id} className="flex items-center gap-4">
               {i > 0 && (
-                <span className="text-2xl font-bold opacity-30">+</span>
+                <span className="hidden sm:inline text-2xl font-bold opacity-30">+</span>
               )}
               <PunkBadge punk={punk} size="lg" showTwitter />
             </div>
           ))}
         </div>
-        <div className="ml-auto">
-          <span className="pixel-tag bg-neutral-100 text-neutral-500">
-            {projects.length} project
-            {projects.length !== 1 ? "s" : ""}
+        <div className="sm:ml-auto shrink-0">
+          <span className="pixel-tag bg-neutral-100 text-neutral-500 whitespace-nowrap">
+            {projects.length} project{projects.length !== 1 ? "s" : ""}
           </span>
         </div>
       </div>

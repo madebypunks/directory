@@ -31,15 +31,15 @@ export function PunkBadge({
         className="transition-all group-hover:translate-x-[-2px] group-hover:translate-y-[-2px] group-hover:shadow-[4px_4px_0_0_var(--shadow-color)]"
       />
       {showName && (
-        <div>
-          <div className={`${config.text} font-bold uppercase tracking-wider group-hover:text-punk-pink transition-colors flex items-baseline gap-2`}>
-            <span>{punk.name || `Punk #${punk.id}`}</span>
-            <span className={`${config.text} font-medium opacity-60 group-hover:text-punk-blue group-hover:opacity-100 transition-all`}>
+        <div className="min-w-0">
+          <div className={`${config.text} font-bold uppercase tracking-wider group-hover:text-punk-pink transition-colors flex items-baseline gap-2 whitespace-nowrap`}>
+            <span className="truncate max-w-[150px] sm:max-w-[200px]">{punk.name || `Punk #${punk.id}`}</span>
+            <span className={`${config.text} font-medium opacity-60 group-hover:text-punk-blue group-hover:opacity-100 transition-all shrink-0`}>
               #{punk.id}
             </span>
           </div>
           {showTwitter && punk.twitter && (
-            <div className={`${config.text} font-medium opacity-60`}>
+            <div className={`${config.text} font-medium opacity-60 truncate`}>
               @{punk.twitter}
             </div>
           )}

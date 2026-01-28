@@ -71,23 +71,6 @@ export function ProjectCard({
           {project.description}
         </p>
 
-        {/* Tags */}
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {project.tags.slice(0, 3).map((tag, i) => (
-            <span
-              key={tag}
-              className={`pixel-tag ${i % 2 === 0 ? "pixel-tag-blue" : "pixel-tag-pink"}`}
-            >
-              {tag}
-            </span>
-          ))}
-          {project.tags.length > 3 && (
-            <span className="pixel-tag bg-neutral-100 text-neutral-500">
-              +{project.tags.length - 3}
-            </span>
-          )}
-        </div>
-
         {/* Social Links + Date */}
         <div className="flex items-center gap-3 pt-2 mt-auto">
           {showPunk && project.creators[0] && (
@@ -133,7 +116,7 @@ export function ProjectCard({
           )}
           <time
             dateTime={project.launchDate}
-            className="ml-auto text-sm font-medium opacity-50 font-mono"
+            className="ml-auto text-base font-medium opacity-50 font-mono"
           >
             {formattedDate}
           </time>
