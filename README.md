@@ -207,7 +207,7 @@ Official CryptoPunks palette:
 
 Deploy your own instance on Vercel:
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/gwendall/madebypunks)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/madebypunks/directory)
 
 ## License
 

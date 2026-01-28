@@ -29,7 +29,7 @@ Every punk can have their own page - like MySpace, but on-chain adjacent.
 
 ### 1. Fork the Repository
 
-Go to [github.com/gwendall/madebypunks](https://github.com/gwendall/madebypunks) and fork the repo.
+Go to [github.com/madebypunks/directory](https://github.com/madebypunks/directory) and fork the repo.
 
 ### 2. Create Your Punk File
 
@@ -214,6 +214,6 @@ madebypunks/
 
 ## Questions?
 
-Open an issue on [GitHub](https://github.com/gwendall/madebypunks/issues).
+Open an issue on [GitHub](https://github.com/madebypunks/directory/issues).
 
 Let's build.

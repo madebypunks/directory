@@ -4,7 +4,7 @@ export const SITE_TAGLINE = "A trustless, community-owned punks directory";
 export const SITE_DESCRIPTION =
   "A trustless, community-owned directory of projects built by CryptoPunks holders. No database, no backend, no gatekeepers. Just git.";
 
-export const GITHUB_URL = "https://github.com/gwendall/madebypunks";
+export const GITHUB_URL = "https://github.com/madebypunks/directory";
 
 // CryptoPunks color palette
 export const COLORS = {
