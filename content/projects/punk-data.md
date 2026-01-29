@@ -1,6 +1,6 @@
 ---
-name: Offspring
-description: 
+name: Punk Data
+description: Comprehensive analytics dashboard for CryptoPunks marketplace data, holder stats, and lending metrics.
 url: https://punkdata.junkdrawer.wtf/
 launchDate: 2025-12-15
 tags:
@@ -14,14 +14,13 @@ creators:
 thumbnail: /projects/punkdata.jpg
 ---
 
-Punkdata is a comprehensive 
+PunkData is a comprehensive analytics dashboard for the CryptoPunks ecosystem.
 
 ## Features
 
 - **Marketplace Analytics** - Track volume, private sales and floor price over time
-- **Holders Data** - Analyze hodler waves, unique holders and punk distribution. 
-- **Lending** - See NFTFi and Ghondi active loans, LTV and Loan Health. 
-- **Punk Strategy** - Monitor $PNKSTR Burn, Supply, Revenue and Punk Holdings.  
-
+- **Holders Data** - Analyze hodler waves, unique holders and punk distribution.
+- **Lending** - See NFTFi and Gondi active loans, LTV and Loan Health.
+- **Punk Strategy** - Monitor $PNKSTR Burn, Supply, Revenue and Punk Holdings.
 
 Part of the JunkDrawer suite of CryptoPunks tools by Pat Doyle, alongside PunkVerse.
