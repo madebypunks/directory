@@ -13,15 +13,14 @@ export function PunkMod({ size = 120, className = "" }: PunkModProps) {
   return (
     <div className={`flex items-center gap-4 ${className}`}>
       <div
-        className="relative overflow-hidden shrink-0"
+        className="relative overflow-hidden shrink-0 flex items-center justify-center"
         style={{ width: size, height: size }}
       >
         <Image
           src={PUNKMOD_URL}
           alt="PunkMod"
-          width={size}
-          height={size}
-          className="pixelated"
+          fill
+          className="pixelated object-contain"
           style={{ imageRendering: "pixelated" }}
           unoptimized
         />
