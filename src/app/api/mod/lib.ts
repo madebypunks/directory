@@ -460,7 +460,7 @@ async function githubGraphQL<T>(query: string, variables?: Record<string, unknow
   return json.data;
 }
 
-// Get discussion details and comments
+// Get discussion details and comments (including nested replies)
 export async function getDiscussion(discussionNumber: number): Promise<{
   discussion: DiscussionDetails;
   comments: DiscussionComment[];
@@ -480,12 +480,26 @@ export async function getDiscussion(discussionNumber: number): Promise<{
               id
               body
               author { login }
+              replies(first: 20) {
+                nodes {
+                  id
+                  body
+                  author { login }
+                }
+              }
             }
           }
         }
       }
     }
   `;
+
+  interface CommentNode {
+    id: string;
+    body: string;
+    author: { login: string };
+    replies?: { nodes: Array<{ id: string; body: string; author: { login: string } }> };
+  }
 
   const data = await githubGraphQL<{
     repository: {
@@ -496,12 +510,33 @@ export async function getDiscussion(discussionNumber: number): Promise<{
         body: string;
         author: { login: string };
         category: { name: string; slug: string };
-        comments: { nodes: Array<{ id: string; body: string; author: { login: string } }> };
+        comments: { nodes: CommentNode[] };
       };
     };
   }>(query, { owner: REPO_OWNER, repo: REPO_NAME, number: discussionNumber });
 
   const d = data.repository.discussion;
+
+  // Flatten comments and their replies into a single array (chronological order)
+  const allComments: DiscussionComment[] = [];
+  for (const comment of d.comments.nodes) {
+    allComments.push({
+      id: comment.id,
+      body: comment.body,
+      author: comment.author,
+    });
+    // Add replies to this comment
+    if (comment.replies?.nodes) {
+      for (const reply of comment.replies.nodes) {
+        allComments.push({
+          id: reply.id,
+          body: reply.body,
+          author: reply.author,
+        });
+      }
+    }
+  }
+
   return {
     discussion: {
       id: d.id,
@@ -511,7 +546,7 @@ export async function getDiscussion(discussionNumber: number): Promise<{
       author: d.author,
       category: d.category,
     },
-    comments: d.comments.nodes,
+    comments: allComments,
   };
 }
 
