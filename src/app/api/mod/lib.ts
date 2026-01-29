@@ -116,6 +116,90 @@ interface GitHubComment {
   body: string;
 }
 
+// URL content fetching via Jina Reader
+interface UrlCheckResult {
+  url: string;
+  status: "ok" | "error" | "timeout";
+  title?: string;
+  description?: string;
+  content?: string; // Truncated markdown content
+  error?: string;
+}
+
+// Extract all URLs from PR file contents
+function extractUrlsFromFiles(files: PRFile[]): string[] {
+  const urlRegex = /https?:\/\/[^\s"'<>)\]]+/g;
+  const urls = new Set<string>();
+
+  for (const file of files) {
+    if (!file.contents) continue;
+    const matches = file.contents.match(urlRegex);
+    if (matches) {
+      for (const url of matches) {
+        // Clean up trailing punctuation
+        const cleanUrl = url.replace(/[.,;:!?)]+$/, "");
+        urls.add(cleanUrl);
+      }
+    }
+  }
+
+  return Array.from(urls);
+}
+
+// Fetch URL content via Jina Reader (returns clean markdown)
+async function fetchUrlContent(url: string): Promise<UrlCheckResult> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+  try {
+    const res = await fetch(`https://r.jina.ai/${url}`, {
+      signal: controller.signal,
+      headers: {
+        Accept: "text/markdown",
+        "X-Return-Format": "markdown",
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      return { url, status: "error", error: `HTTP ${res.status}` };
+    }
+
+    const text = await res.text();
+
+    // Extract title from first # heading or first line
+    const titleMatch = text.match(/^#\s+(.+)$/m);
+    const title = titleMatch?.[1] || text.split("\n")[0]?.slice(0, 100);
+
+    // Extract description (first paragraph after title)
+    const descMatch = text.match(/^#.+\n+([^#\n].+)/m);
+    const description = descMatch?.[1]?.slice(0, 200);
+
+    // Truncate content to avoid context explosion (max 1500 chars)
+    const content = text.length > 1500 ? text.slice(0, 1500) + "\n\n[...truncated]" : text;
+
+    return { url, status: "ok", title, description, content };
+  } catch (e) {
+    clearTimeout(timeoutId);
+    if (e instanceof Error && e.name === "AbortError") {
+      return { url, status: "timeout", error: "Request timed out (10s)" };
+    }
+    return { url, status: "error", error: String(e) };
+  }
+}
+
+// Fetch all URLs from PR files (in parallel, max 5)
+async function fetchAllUrls(files: PRFile[]): Promise<UrlCheckResult[]> {
+  const urls = extractUrlsFromFiles(files);
+
+  // Limit to 5 URLs to avoid rate limits and context explosion
+  const urlsToFetch = urls.slice(0, 5);
+
+  const results = await Promise.all(urlsToFetch.map(fetchUrlContent));
+  return results;
+}
+
 // Generate JWT for GitHub App authentication
 function generateJWT(): string {
   if (!GITHUB_APP_ID) {
@@ -357,10 +441,28 @@ export async function postComment(prNumber: number, body: string) {
 export async function analyzeWithClaude(prDetails: PRDetails, files: PRFile[], comments: GitHubComment[] = []): Promise<ReviewResult> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+  // Fetch URL content in parallel with building context
+  const urlResults = await fetchAllUrls(files);
+
   const filesContext = files
     .filter((f) => f.contents)
     .map((f) => `### ${f.filename}\n\`\`\`markdown\n${f.contents}\n\`\`\``)
     .join("\n\n");
+
+  // Build URL context for Claude
+  const urlContext = urlResults.length > 0
+    ? `\n\n## URL Verification Results\nI've fetched the URLs from this submission. Use this to verify the project is legit:\n\n${urlResults
+        .map((r) => {
+          if (r.status === "ok") {
+            return `### ${r.url}\n- **Status:** ✅ Accessible\n- **Title:** ${r.title || "N/A"}\n- **Description:** ${r.description || "N/A"}\n\n<details><summary>Page content (truncated)</summary>\n\n${r.content}\n\n</details>`;
+          } else if (r.status === "timeout") {
+            return `### ${r.url}\n- **Status:** ⏱️ Timeout - site may be slow or down`;
+          } else {
+            return `### ${r.url}\n- **Status:** ❌ Error: ${r.error}`;
+          }
+        })
+        .join("\n\n")}`
+    : "";
 
   const lastCommenter = comments.length > 0 ? comments[comments.length - 1].user.login : null;
   const conversationContext = comments.length > 0
@@ -368,7 +470,13 @@ export async function analyzeWithClaude(prDetails: PRDetails, files: PRFile[], c
 - The last person who commented is @${lastCommenter} - address THEM directly in your response (not the PR author unless they're the same person)
 - Read the conversation above and respond to what was asked
 - Don't repeat your previous review - focus on what's new or what was asked
-- If a moderator or maintainer is talking to you, acknowledge them appropriately`
+- If a moderator or maintainer is talking to you, acknowledge them appropriately
+- BE FLEXIBLE: understand conversational requests! Examples:
+  - "check the site" / "look at the URL" → use URL content to fill missing fields
+  - "the description is X" → update the file with X
+  - "it launched last month" → figure out the date and add it
+  - "use whatever you think is best" → make a reasonable choice and apply it
+  - ANY instruction that implies you should do something → DO IT and push the fix!`
     : "";
 
   const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
@@ -411,25 +519,37 @@ You are reviewing pull requests for Made By Punks, a community directory of Cryp
 - **Description:** ${prDetails.body || "No description provided"}
 
 ## Files Changed
-${filesContext}${conversationContext}
+${filesContext}${urlContext}${conversationContext}
 
 ## Your Task
-BE PROACTIVE - fix things yourself whenever possible!
+BE PROACTIVE and FLEXIBLE - fix things yourself whenever possible!
 
 IMPORTANT: Any files you put in "fixedFiles" will be AUTOMATICALLY PUSHED to the PR branch!
 This means you can directly fix issues without asking the contributor to do it manually.
 
+UNDERSTAND INTENT: Contributors are not developers. They'll give you info conversationally.
+- If they tell you something → use it to fix the file
+- If they ask you to do something → do it
+- If they're vague → make a reasonable choice based on URL content and context
+- Don't be literal - understand what they MEAN, not just what they SAY
+
 1. Check each file against the schema
-2. Common issues to FIX (don't just report - provide the fix):
-   - Empty description → ask what the project does, OR if they tell you in conversation, add it yourself!
+2. **VERIFY URLs** using the URL Verification Results above:
+   - Is the site accessible? (✅ = good, ❌ = problem, ⏱️ = maybe slow)
+   - Does the site title/content match the project name?
+   - Does it look like a legit punk project or a scam?
+   - If URLs are dead or suspicious → flag it!
+3. Common issues to FIX (don't just report - provide the fix):
+   - Empty description → FIRST check the URL content above! Extract a description from the site and use it. Only ask if URL content doesn't help.
    - Wrong date format → convert to YYYY-MM-DD
    - creators as strings → convert to numbers
-   - Missing tags → suggest relevant ones based on the project
+   - Missing tags → suggest relevant ones based on the project AND URL content
    - Typos in field names → fix them
    - If contributor provides info in comments → UPDATE THE FILE with that info!
-3. If the PR looks good → mark as ready for human review
-4. If there are issues you can fix → provide the COMPLETE fixed file in fixedFiles (it will be pushed!)
-5. If contributor gives you info conversationally (e.g., "the description is X") → add it to fixedFiles!
+   - If contributor says "check the site" or similar → USE THE URL CONTENT to fill missing fields!
+4. If the PR looks good → mark as ready for human review
+5. If there are issues you can fix → provide the COMPLETE fixed file in fixedFiles (it will be pushed!)
+6. If contributor gives you info conversationally (e.g., "the description is X") → add it to fixedFiles!
 
 Respond in JSON:
 {
@@ -443,9 +563,13 @@ Respond in JSON:
 }
 
 STATUS GUIDE:
-- "ready_for_review": Everything looks good, a human moderator can review and merge
+- "ready_for_review": Everything looks good (valid schema + URLs are accessible + content looks legit)
 - "needs_changes": The contributor needs to fix something (validation errors, missing info)
-- "suspicious": Something looks off (fake URL, impersonation, scam vibes) - explain in suspiciousReasons
+- "suspicious": Something looks off - USE THIS IF:
+  - URL returns error/timeout and looks intentionally fake
+  - Site content doesn't match project name (impersonation)
+  - Site looks like a scam, phishing, or malware
+  - Explain in suspiciousReasons!
 - "needs_info": You need more information from the contributor to proceed
 
 RULES:
