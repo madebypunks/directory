@@ -17,7 +17,7 @@ export default function NotFound() {
           </p>
           <Link
             href="/"
-            className="pixel-btn mt-8 inline-block px-8 py-3 text-sm"
+            className="pixel-btn mt-8 inline-block px-8 py-3"
           >
             ← Back to home
           </Link>

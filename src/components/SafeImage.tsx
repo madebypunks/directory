@@ -22,7 +22,7 @@ export function SafeImage({
         <div className="flex flex-col items-center gap-2 text-white opacity-60">
           <BrokenImageIcon className="h-8 w-8" />
           {fallbackText && (
-            <span className="text-xs font-bold uppercase tracking-wider">
+            <span className="text-xs text-center font-bold uppercase tracking-wider">
               {fallbackText}
             </span>
           )}

@@ -34,7 +34,7 @@ export function ProjectThumbnail({
     // Fallback: show project initial
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-punk-blue-light">
-        <span className="text-6xl font-black uppercase text-white opacity-60">
+        <span className="text-6xl font-black uppercase text-white text-center opacity-60">
           {projectName.charAt(0)}
         </span>
       </div>

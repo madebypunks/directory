@@ -60,26 +60,28 @@ export function ProjectListItem({ project, collaborators, size = "compact" }: Pr
           </time>
         </div>
 
+        <p className={`mt-1 opacity-70 leading-snug ${isDefault ? 'text-base line-clamp-2' : 'text-base line-clamp-1 sm:line-clamp-2'}`}>
+          {project.description}
+        </p>
+
         {/* Collaborators */}
         {collaborators && collaborators.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-sm">
-            <span className="opacity-50">with</span>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="opacity-50">With</span>
             {collaborators.map((collab) => (
               <span
                 key={collab.id}
                 onClick={(e) => handleCollaboratorClick(e, collab.id)}
-                className="flex items-center gap-1 whitespace-nowrap bg-foreground/5 px-1.5 py-0.5 hover:bg-foreground/10 transition-colors"
+                className="flex items-center whitespace-nowrap bg-foreground/5 hover:bg-foreground/10 border border-transparent hover:border-white/10 transition-colors"
+                style={{ height: 20 }}
               >
-                <PunkAvatar punkId={collab.id} size={14} />
-                <span className="opacity-70">{collab.name || `#${collab.id}`}</span>
+                <PunkAvatar punkId={collab.id} size={18} />
+                <div className="px-1.5 py-0.5 opacity-70">{collab.name || `#${collab.id}`}</div>
               </span>
             ))}
           </div>
         )}
 
-        <p className={`mt-1 opacity-70 leading-snug ${isDefault ? 'text-sm sm:text-base line-clamp-2' : 'text-sm sm:text-base line-clamp-1 sm:line-clamp-2'}`}>
-          {project.description}
-        </p>
       </div>
     </Link>
   );

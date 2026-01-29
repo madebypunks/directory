@@ -25,10 +25,10 @@ export function PunkSection({ punks, projects, isFirst = false }: PunkSectionPro
                 >
                   <PunkAvatar punkId={punk.id} size={32} />
                   <div className="flex flex-col">
-                    <span className="text-sm font-bold uppercase tracking-wide group-hover:text-punk-pink transition-colors">
+                    <span className="font-bold uppercase tracking-wide group-hover:text-punk-pink transition-colors">
                       {punk.name || `Punk`}
                     </span>
-                    <span className="text-sm opacity-50">
+                    <span className="opacity-50">
                       #{punk.id}
                     </span>
                   </div>
@@ -38,7 +38,7 @@ export function PunkSection({ punks, projects, isFirst = false }: PunkSectionPro
           </div>
 
           {/* Project count */}
-          <span className="ml-auto text-sm font-medium opacity-50 whitespace-nowrap">
+          <span className="ml-auto font-medium opacity-50 whitespace-nowrap">
             {projects.length} work{projects.length !== 1 ? "s" : ""}
           </span>
         </div>

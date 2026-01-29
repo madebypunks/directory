@@ -114,16 +114,17 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
                   {creators.length > 0 && (
                     <div className="mt-4">
-                      <span className="block mb-2 text-white/40">Creators:</span>
+                      <span className="block mb-2 text-white/40">Creator{creators.length>1?"s":""}:</span>
                       <div className="flex flex-wrap gap-2">
                         {creators.map((creator) => (
                           <Link
                             key={creator.id}
                             href={`/${creator.id}`}
-                            className="flex items-center gap-1.5 whitespace-nowrap bg-white/10 px-2 py-1 hover:bg-white/20 transition-colors"
+                            className="flex items-center whitespace-nowrap bg-white/10 hover:bg-white/20 border border-transparent hover:border-white/10 transition-colors"
+                            style={{ height: 30 }}
                           >
-                            <PunkAvatar punkId={creator.id} size={20} className="border-0!" />
-                            <span className="text-white/80">{creator.name || `#${creator.id}`}</span>
+                            <PunkAvatar punkId={creator.id} size={28} className="border-0!" />
+                            <div className="pl-1.5 pr-2 py-1 text-white/80">{creator.name || `#${creator.id}`}</div>
                           </Link>
                         ))}
                       </div>

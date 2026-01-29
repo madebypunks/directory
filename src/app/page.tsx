@@ -29,7 +29,7 @@ export default function HomePage() {
                 <span className="text-2xl font-bold text-white">
                   {punkIds.length}
                 </span>
-                <span className="ml-2 text-sm font-bold uppercase tracking-wider text-white font-pixel">
+                <span className="ml-2 font-bold uppercase tracking-wider text-white font-pixel">
                   Punks
                 </span>
               </div>
@@ -37,7 +37,7 @@ export default function HomePage() {
                 <span className="text-2xl font-bold text-white">
                   {totalProjects}
                 </span>
-                <span className="ml-2 text-sm font-bold uppercase tracking-wider text-white font-pixel">
+                <span className="ml-2 font-bold uppercase tracking-wider text-white font-pixel">
                   Works
                 </span>
               </div>

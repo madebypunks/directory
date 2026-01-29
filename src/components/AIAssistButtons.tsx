@@ -87,7 +87,7 @@ export function AIAssistButtons({ className = "" }: AIAssistButtonsProps) {
 
   return (
     <div className={`flex flex-col gap-4 ${className}`}>
-      <p className="text-sm opacity-70">
+      <p className="opacity-70">
         Need help? Open with an AI assistant:
       </p>
       <div className="flex flex-wrap gap-3">

@@ -36,6 +36,16 @@ export function SearchOverlay({ items }: SearchOverlayProps) {
   const punks = filteredItems.filter((item) => item.type === "punk");
   const projects = filteredItems.filter((item) => item.type === "project");
 
+  const handleClose = () => {
+    setIsOpen(false);
+    setQuery("");
+  };
+
+  const handleSelect = (item: SearchItem) => {
+    router.push(item.slug);
+    handleClose();
+  };
+
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
@@ -56,16 +66,6 @@ export function SearchOverlay({ items }: SearchOverlayProps) {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
-
-  const handleClose = () => {
-    setIsOpen(false);
-    setQuery("");
-  };
-
-  const handleSelect = (item: SearchItem) => {
-    router.push(item.slug);
-    handleClose();
-  };
 
   if (!isOpen) {
     return (
@@ -114,7 +114,7 @@ export function SearchOverlay({ items }: SearchOverlayProps) {
             <div className="max-h-[60vh] overflow-y-auto">
               {punks.length === 0 && projects.length === 0 ? (
                 <div className="px-4 py-8 text-center opacity-50">
-                  No results for "{query}"
+                  No results for &quot;{query}&quot;
                 </div>
               ) : (
                 <>
@@ -162,7 +162,7 @@ export function SearchOverlay({ items }: SearchOverlayProps) {
 
           {/* Hint */}
           {!query.trim() && (
-            <div className="px-4 py-6 text-center opacity-40 text-sm">
+            <div className="px-4 py-6 text-center opacity-40">
               Type to search punks by name or ID, or projects by name
             </div>
           )}

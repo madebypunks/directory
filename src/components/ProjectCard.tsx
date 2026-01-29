@@ -50,7 +50,7 @@ export function ProjectCard({
 
         {/* Collaborators */}
         {collaborators && collaborators.length > 0 && (
-          <div className="mb-2 flex items-center gap-2 text-sm opacity-70">
+          <div className="mb-2 flex items-center gap-2 opacity-70">
             <span>with</span>
             <div className="flex items-center gap-1.5">
               {collaborators.map((collab) => (
