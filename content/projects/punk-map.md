@@ -1,13 +1,13 @@
 ---
 name: Punk Map
-description: A geo-based punk directory where you can see which places punks can get into, displayed on an interactive map to help you find punk-friendly spots in any city.
+description: A token-gated check-in app for CryptoPunks holders to share city-level locations and profiles with fellow punks - like Foursquare for the punk community, with opsec-first design.
 url: https://punkmap.com
 launchDate: 2025-06-15
 tags:
   - directory
   - community
-  - geolocation
-  - travel
+  - social
+  - utility
 creators:
   - 2113
 ---
