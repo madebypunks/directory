@@ -75,8 +75,9 @@ Your personality:
 - Casual language - like a knowledgeable friend helping out
 - You might drop punk references or trivia when relevant
 - Keep it positive - every legit project is a win for the community
-- ALWAYS address the contributor by their GitHub username (e.g., "Hey @username!" or "Thanks @username!")
-- Make it personal - they're part of the community now`;
+- ALWAYS address the person you're responding to by their GitHub username (e.g., "Hey @username!")
+- If someone other than the PR author talks to you, address THEM, not the PR author
+- Make it personal - everyone in the conversation is part of the community`;
 
 export const REPO_OWNER = process.env.GITHUB_REPO_OWNER || "madebypunks";
 export const REPO_NAME = process.env.GITHUB_REPO_NAME || "directory";
@@ -216,8 +217,107 @@ export async function github(path: string, options?: RequestInit) {
   return res.json();
 }
 
+// GitHub API helper for any repo (for working with forks)
+async function githubRepo(owner: string, repo: string, path: string, options?: RequestInit) {
+  const token = await getInstallationToken();
+
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github.v3+json",
+      ...options?.headers,
+    },
+  });
+  return res.json();
+}
+
 export async function getOpenPRs() {
   return github("/pulls?state=open");
+}
+
+// Get PR head branch information (needed for pushing to the PR branch)
+export interface PRBranchInfo {
+  owner: string;     // Fork owner (or same as base for same-repo PRs)
+  repo: string;      // Fork repo name
+  branch: string;    // Branch name
+  sha: string;       // Latest commit SHA
+}
+
+export async function getPRBranchInfo(prNumber: number): Promise<PRBranchInfo> {
+  const pr = await github(`/pulls/${prNumber}`);
+  return {
+    owner: pr.head.repo.owner.login,
+    repo: pr.head.repo.name,
+    branch: pr.head.ref,
+    sha: pr.head.sha,
+  };
+}
+
+// Get file SHA from a branch (needed for updating existing files)
+async function getFileSHA(owner: string, repo: string, path: string, branch: string): Promise<string | null> {
+  try {
+    const result = await githubRepo(owner, repo, `/contents/${path}?ref=${branch}`);
+    return result.sha || null;
+  } catch {
+    return null; // File doesn't exist
+  }
+}
+
+// Push fixed files to the PR branch
+export async function pushFixesToPR(
+  prNumber: number,
+  fixedFiles: { filename: string; content: string }[]
+): Promise<{ success: boolean; commitUrl?: string; error?: string }> {
+  if (fixedFiles.length === 0) {
+    return { success: false, error: "No files to push" };
+  }
+
+  try {
+    const branchInfo = await getPRBranchInfo(prNumber);
+    const token = await getInstallationToken();
+
+    // Push each file as a separate commit (simpler than creating a tree)
+    let lastCommitUrl = "";
+
+    for (const file of fixedFiles) {
+      // Get current file SHA if it exists (required for updates)
+      const fileSHA = await getFileSHA(branchInfo.owner, branchInfo.repo, file.filename, branchInfo.branch);
+
+      // Create or update the file
+      const res = await fetch(
+        `https://api.github.com/repos/${branchInfo.owner}/${branchInfo.repo}/contents/${file.filename}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github.v3+json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            message: `fix: Auto-fix by PunkModBot\n\n🤖 Applied formatting fixes to ${file.filename}`,
+            content: Buffer.from(file.content).toString("base64"),
+            branch: branchInfo.branch,
+            ...(fileSHA ? { sha: fileSHA } : {}),
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const error = await res.text();
+        console.error(`Failed to push ${file.filename}:`, error);
+        return { success: false, error: `Failed to update ${file.filename}: ${error}` };
+      }
+
+      const result = await res.json();
+      lastCommitUrl = result.commit?.html_url || "";
+    }
+
+    return { success: true, commitUrl: lastCommitUrl };
+  } catch (error) {
+    console.error("Error pushing fixes:", error);
+    return { success: false, error: String(error) };
+  }
 }
 
 export async function getPRComments(prNumber: number): Promise<GitHubComment[]> {
@@ -262,8 +362,13 @@ export async function analyzeWithClaude(prDetails: PRDetails, files: PRFile[], c
     .map((f) => `### ${f.filename}\n\`\`\`markdown\n${f.contents}\n\`\`\``)
     .join("\n\n");
 
+  const lastCommenter = comments.length > 0 ? comments[comments.length - 1].user.login : null;
   const conversationContext = comments.length > 0
-    ? `\n\n## Conversation History\n${comments.map((c) => `**@${c.user.login}:** ${c.body}`).join("\n\n")}\n\nIMPORTANT: Read the conversation above. If someone asked you a question or provided information, acknowledge it and respond appropriately. Don't repeat your previous review - focus on what's new or what was asked.`
+    ? `\n\n## Conversation History\n${comments.map((c) => `**@${c.user.login}:** ${c.body}`).join("\n\n")}\n\nIMPORTANT:
+- The last person who commented is @${lastCommenter} - address THEM directly in your response (not the PR author unless they're the same person)
+- Read the conversation above and respond to what was asked
+- Don't repeat your previous review - focus on what's new or what was asked
+- If a moderator or maintainer is talking to you, acknowledge them appropriately`
     : "";
 
   const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
@@ -311,15 +416,20 @@ ${filesContext}${conversationContext}
 ## Your Task
 BE PROACTIVE - fix things yourself whenever possible!
 
+IMPORTANT: Any files you put in "fixedFiles" will be AUTOMATICALLY PUSHED to the PR branch!
+This means you can directly fix issues without asking the contributor to do it manually.
+
 1. Check each file against the schema
 2. Common issues to FIX (don't just report - provide the fix):
-   - Empty description → ask what the project does
+   - Empty description → ask what the project does, OR if they tell you in conversation, add it yourself!
    - Wrong date format → convert to YYYY-MM-DD
    - creators as strings → convert to numbers
    - Missing tags → suggest relevant ones based on the project
    - Typos in field names → fix them
+   - If contributor provides info in comments → UPDATE THE FILE with that info!
 3. If the PR looks good → mark as ready for human review
-4. If there are issues → provide the COMPLETE fixed file
+4. If there are issues you can fix → provide the COMPLETE fixed file in fixedFiles (it will be pushed!)
+5. If contributor gives you info conversationally (e.g., "the description is X") → add it to fixedFiles!
 
 Respond in JSON:
 {
@@ -342,6 +452,8 @@ RULES:
 - Keep summary SHORT - this is not an essay
 - If you can fix it, fix it - don't ask
 - fixedFiles must contain the COMPLETE file content (frontmatter + body)
+- fixedFiles will be AUTOMATICALLY COMMITTED to the PR - use this power wisely!
+- When someone tells you info in conversation, UPDATE the file via fixedFiles
 - You NEVER approve or merge - you only prepare for human review
 - Be friendly but concise - respect people's time`;
 
@@ -371,7 +483,10 @@ function getStatusBadge(status: ReviewStatus): string {
   }
 }
 
-export function formatComment(result: ReviewResult): string {
+export function formatComment(
+  result: ReviewResult,
+  pushResult?: { success: boolean; commitUrl?: string; error?: string } | null
+): string {
   const lines: string[] = [result.summary, "", getStatusBadge(result.status), ""];
 
   if (result.status === "suspicious" && result.suspiciousReasons?.length) {
@@ -386,10 +501,30 @@ export function formatComment(result: ReviewResult): string {
   if (result.needsClarification.length) {
     lines.push("### ❓ Questions", ...result.needsClarification.map((q) => `- ${q}`), "");
   }
-  if (result.fixedFiles.length) {
-    lines.push("### 🔧 Suggested Fixes", "*Copy these fixes to your files:*", "");
-    for (const f of result.fixedFiles) {
-      lines.push(`<details><summary><code>${f.filename}</code></summary>`, "", "```markdown", f.content, "```", "</details>", "");
+
+  // Show fix status
+  if (result.fixedFiles.length > 0) {
+    if (pushResult?.success) {
+      lines.push(
+        "### ✨ Fixes Applied",
+        "I've automatically updated your files with the fixes!",
+        pushResult.commitUrl ? `[View commit](${pushResult.commitUrl})` : "",
+        ""
+      );
+    } else if (pushResult?.error) {
+      lines.push(
+        "### 🔧 Suggested Fixes",
+        `*I couldn't push the fixes automatically (${pushResult.error}). Please copy these to your files:*`,
+        ""
+      );
+      for (const f of result.fixedFiles) {
+        lines.push(`<details><summary><code>${f.filename}</code></summary>`, "", "```markdown", f.content, "```", "</details>", "");
+      }
+    } else {
+      lines.push("### 🔧 Suggested Fixes", "*Copy these fixes to your files:*", "");
+      for (const f of result.fixedFiles) {
+        lines.push(`<details><summary><code>${f.filename}</code></summary>`, "", "```markdown", f.content, "```", "</details>", "");
+      }
     }
   }
 
@@ -414,7 +549,7 @@ function shouldSkipReview(comments: GitHubComment[]): boolean {
 }
 
 // Review a single PR
-export async function reviewPR(prNumber: number, forceReview = false): Promise<{ reviewed: boolean; reason?: string }> {
+export async function reviewPR(prNumber: number, forceReview = false): Promise<{ reviewed: boolean; reason?: string; fixesPushed?: boolean }> {
   const comments = await getPRComments(prNumber);
 
   if (!forceReview && shouldSkipReview(comments)) {
@@ -428,9 +563,20 @@ export async function reviewPR(prNumber: number, forceReview = false): Promise<{
   }
 
   const result = await analyzeWithClaude(details, files, comments);
-  await postComment(prNumber, formatComment(result));
 
-  return { reviewed: true };
+  // If there are fixed files, push them to the PR branch
+  let fixesPushed = false;
+  let pushResult: { success: boolean; commitUrl?: string; error?: string } | null = null;
+
+  if (result.fixedFiles.length > 0) {
+    pushResult = await pushFixesToPR(prNumber, result.fixedFiles);
+    fixesPushed = pushResult.success;
+  }
+
+  // Post comment with the review (and info about pushed fixes)
+  await postComment(prNumber, formatComment(result, pushResult));
+
+  return { reviewed: true, fixesPushed };
 }
 
 // Webhook signature verification
