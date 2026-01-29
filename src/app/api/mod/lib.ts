@@ -460,10 +460,16 @@ async function githubGraphQL<T>(query: string, variables?: Record<string, unknow
   return json.data;
 }
 
+// Extended comment type that tracks parent for nested replies
+export interface DiscussionCommentWithParent extends DiscussionComment {
+  parentId?: string; // ID of the top-level comment (undefined if this IS a top-level comment)
+}
+
 // Get discussion details and comments (including nested replies)
 export async function getDiscussion(discussionNumber: number): Promise<{
   discussion: DiscussionDetails;
-  comments: DiscussionComment[];
+  comments: DiscussionCommentWithParent[];
+  topLevelComments: DiscussionComment[]; // Only top-level comments (for replying)
 }> {
   const query = `
     query($owner: String!, $repo: String!, $number: Int!) {
@@ -517,13 +523,22 @@ export async function getDiscussion(discussionNumber: number): Promise<{
 
   const d = data.repository.discussion;
 
+  // Collect top-level comments separately
+  const topLevelComments: DiscussionComment[] = d.comments.nodes.map(c => ({
+    id: c.id,
+    body: c.body,
+    author: c.author,
+  }));
+
   // Flatten comments and their replies into a single array (chronological order)
-  const allComments: DiscussionComment[] = [];
+  // Keep track of parent ID for nested replies
+  const allComments: DiscussionCommentWithParent[] = [];
   for (const comment of d.comments.nodes) {
     allComments.push({
       id: comment.id,
       body: comment.body,
       author: comment.author,
+      parentId: undefined, // Top-level comment
     });
     // Add replies to this comment
     if (comment.replies?.nodes) {
@@ -532,6 +547,7 @@ export async function getDiscussion(discussionNumber: number): Promise<{
           id: reply.id,
           body: reply.body,
           author: reply.author,
+          parentId: comment.id, // Track parent
         });
       }
     }
@@ -547,6 +563,7 @@ export async function getDiscussion(discussionNumber: number): Promise<{
       category: d.category,
     },
     comments: allComments,
+    topLevelComments,
   };
 }
 
@@ -1480,7 +1497,7 @@ If the discussion is spam, off-topic garbage, or you genuinely have nothing usef
 export async function handleDiscussion(
   discussionNumber: number
 ): Promise<{ replied: boolean; reason?: string; prCreated?: boolean; prUrl?: string }> {
-  const { discussion, comments } = await getDiscussion(discussionNumber);
+  const { discussion, comments, topLevelComments } = await getDiscussion(discussionNumber);
 
   const result = await analyzeDiscussion(discussion, comments);
 
@@ -1542,10 +1559,26 @@ export async function handleDiscussion(
   }
 
   // Determine where to post the reply:
-  // - If there are comments, reply to the last one (nested reply)
-  // - If no comments yet, post as a top-level comment
-  const lastComment = comments.length > 0 ? comments[comments.length - 1] : null;
-  const replyToId = lastComment?.id;
+  // GitHub Discussions only allow 2 levels: top-level comments and replies to them.
+  // We can't reply to a reply (3rd level), so we need to find a top-level comment to reply to.
+  //
+  // Strategy:
+  // 1. If the bot has a top-level comment, reply to that (creates a thread)
+  // 2. Otherwise, if there's any top-level comment, reply to the first one
+  // 3. If no comments at all, post as a new top-level comment
+  const botLogin = `${GITHUB_APP_SLUG}[bot]`;
+  const botTopLevelComment = topLevelComments.find(c => c.author.login === botLogin);
+  const firstTopLevelComment = topLevelComments[0];
+
+  let replyToId: string | undefined;
+  if (botTopLevelComment) {
+    // Reply to bot's own thread
+    replyToId = botTopLevelComment.id;
+  } else if (firstTopLevelComment) {
+    // Reply to the first comment (start a thread there)
+    replyToId = firstTopLevelComment.id;
+  }
+  // else: no replyToId = create a new top-level comment
 
   await postDiscussionComment(discussion.id, result.reply, replyToId);
 
