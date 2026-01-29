@@ -388,7 +388,9 @@ export function formatComment(result: ReviewResult): string {
 // Check if the bot has already commented on this PR
 function hasAlreadyReviewed(comments: GitHubComment[]): boolean {
   const botLogin = `${GITHUB_APP_SLUG}[bot]`;
-  return comments.some((c) => c.user.login === botLogin || c.user.type === "Bot");
+  console.log("Looking for bot:", botLogin);
+  console.log("Comment authors:", comments.map((c) => c.user.login));
+  return comments.some((c) => c.user.login === botLogin);
 }
 
 // Review a single PR
