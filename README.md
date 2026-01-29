@@ -156,10 +156,12 @@ When you open a pull request, **PunkMod** will automatically review your submiss
 
 - **Reviews your files** - Checks if your submission follows the correct format
 - **Fetches your URLs** - Verifies that your project links are working and legit
+- **Filters scams and spam** - Protects the directory from fake projects, phishing, and bad actors
+- **Ensures relevance** - Makes sure submissions are actually related to CryptoPunks
 - **Suggests fixes** - If something's wrong, PunkMod will tell you exactly what to fix
 - **Has conversations** - You can reply to PunkMod and ask questions
 
-PunkMod is here to help contributors submit quality data and protect the directory from spam and scams. Don't worry if your first submission isn't perfect - PunkMod will guide you through it!
+PunkMod is here to help contributors submit quality data and keep the directory clean. Don't worry if your first submission isn't perfect - PunkMod will guide you through it!
 
 > **Note:** PunkMod never approves or merges PRs. A human maintainer always has the final say.
 

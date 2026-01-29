@@ -62,10 +62,12 @@ When you submit a pull request, **PunkMod** will greet you. PunkMod is our AI as
 PunkMod will:
 - **Check your files** for missing or incorrect data
 - **Verify your URLs** to make sure they work
+- **Filter scams and spam** - protects the directory from fake projects and phishing attempts
+- **Ensure relevance** - makes sure submissions are actually related to CryptoPunks
 - **Suggest fixes** if something needs adjusting
 - **Answer questions** - just reply to the bot!
 
-Don't stress about getting everything perfect on your first try. PunkMod is patient and will help you through the process. It's like having a helpful punk friend who knows all the rules.
+Don't stress about getting everything perfect on your first try. PunkMod is patient and will help you through the process. It's like having a helpful punk friend who knows all the rules and keeps the bad actors out.
 
 > PunkMod prepares submissions for review but never merges anything. A human maintainer always makes the final call.
 
