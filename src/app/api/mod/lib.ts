@@ -16,6 +16,93 @@ export type GitHubPullRequestDetails = PullsGetResponse["data"];
 export type GitHubIssue = IssuesGetResponse["data"];
 export type GitHubIssueComment = IssuesListCommentsResponse["data"][number];
 
+// =============================================================================
+// ANTHROPIC ERROR HANDLING
+// =============================================================================
+
+interface AnthropicErrorInfo {
+  isAnthropicError: boolean;
+  errorType: string;
+  userMessage: string;
+  isRetryable: boolean;
+}
+
+// Parse Anthropic API errors and return user-friendly messages
+function parseAnthropicError(error: unknown): AnthropicErrorInfo {
+  const defaultError: AnthropicErrorInfo = {
+    isAnthropicError: false,
+    errorType: "unknown",
+    userMessage: "I ran into a technical issue while processing your request.",
+    isRetryable: true,
+  };
+
+  if (!(error instanceof Error)) return defaultError;
+
+  const errorStr = error.message || String(error);
+
+  // Check for credit balance error
+  if (errorStr.includes("credit balance is too low") || errorStr.includes("insufficient_quota")) {
+    return {
+      isAnthropicError: true,
+      errorType: "insufficient_credits",
+      userMessage: "⚠️ **Service temporarily unavailable**\n\nThe AI service is currently unavailable due to a billing issue. A maintainer has been notified and will resolve this shortly.\n\nIn the meantime, you can:\n- Wait for the issue to be resolved\n- Submit your request manually via a Pull Request",
+      isRetryable: false,
+    };
+  }
+
+  // Check for rate limit error
+  if (errorStr.includes("rate_limit") || errorStr.includes("Too many requests")) {
+    return {
+      isAnthropicError: true,
+      errorType: "rate_limit",
+      userMessage: "⏳ **Rate limit reached**\n\nI'm processing too many requests right now. Please try again in a few minutes!",
+      isRetryable: true,
+    };
+  }
+
+  // Check for overloaded error
+  if (errorStr.includes("overloaded") || errorStr.includes("503")) {
+    return {
+      isAnthropicError: true,
+      errorType: "overloaded",
+      userMessage: "🔄 **Service busy**\n\nThe AI service is currently overloaded. Please try again in a few minutes!",
+      isRetryable: true,
+    };
+  }
+
+  // Check for invalid request (usually our fault)
+  if (errorStr.includes("invalid_request_error")) {
+    return {
+      isAnthropicError: true,
+      errorType: "invalid_request",
+      userMessage: "🤖 **Processing error**\n\nI had trouble understanding your request. Could you try:\n1. Breaking it into smaller parts\n2. Or simplifying the request\n\nIf this keeps happening, a moderator can help!",
+      isRetryable: true,
+    };
+  }
+
+  // Check for authentication error
+  if (errorStr.includes("authentication") || errorStr.includes("api_key") || errorStr.includes("401")) {
+    return {
+      isAnthropicError: true,
+      errorType: "authentication",
+      userMessage: "🔐 **Configuration error**\n\nThere's an issue with my configuration. A maintainer has been notified!",
+      isRetryable: false,
+    };
+  }
+
+  // Check for context length error
+  if (errorStr.includes("context_length") || errorStr.includes("too long") || errorStr.includes("max_tokens")) {
+    return {
+      isAnthropicError: true,
+      errorType: "context_length",
+      userMessage: "📏 **Request too large**\n\nYour request contains too much content for me to process at once. Could you try:\n1. Breaking it into smaller parts\n2. Removing any large images or long text blocks",
+      isRetryable: false,
+    };
+  }
+
+  return defaultError;
+}
+
 // Helper to repair and parse JSON from Claude's response
 // Handles common issues like unescaped newlines in strings
 function parseClaudeJSON<T>(text: string): T {
@@ -1616,7 +1703,22 @@ export async function reviewPR(prNumber: number, forceReview = false): Promise<{
     return { reviewed: false, reason: "no_content_files" };
   }
 
-  const result = await analyzeWithClaude(details, files, comments);
+  let result: ReviewResult;
+  try {
+    result = await analyzeWithClaude(details, files, comments);
+  } catch (error) {
+    // Parse the error for a user-friendly message
+    const errorInfo = parseAnthropicError(error);
+    console.error(`[reviewPR] Analysis failed for PR #${prNumber} (${errorInfo.errorType}):`, error);
+
+    const errorComment = `Hey @${details.user.login}! 🤖
+
+${errorInfo.userMessage}
+
+I'll try to review your PR again once this is resolved. Thanks for your patience! 🙏`;
+    await postComment(prNumber, errorComment);
+    return { reviewed: false, reason: `analysis_error:${errorInfo.errorType}` };
+  }
 
   // If there are fixed files, push them to the PR branch
   let fixesPushed = false;
@@ -1798,19 +1900,17 @@ export async function handleDiscussion(
   try {
     result = await analyzeDiscussion(discussion, comments);
   } catch (error) {
-    // If analysis fails (e.g., JSON parsing error), post a friendly error message
-    console.error(`[handleDiscussion] Analysis failed for discussion #${discussionNumber}:`, error);
+    // Parse the error for a user-friendly message
+    const errorInfo = parseAnthropicError(error);
+    console.error(`[handleDiscussion] Analysis failed for discussion #${discussionNumber} (${errorInfo.errorType}):`, error);
+
     const errorReply = `Hey @${discussion.author.login}! 🤖
 
-I tried to process your request but ran into a technical issue. This can happen when I try to generate a response that's too complex.
-
-Could you try:
-1. Breaking your request into smaller parts
-2. Or, a moderator can help manually
+${errorInfo.userMessage}
 
 Sorry about that! 🙏`;
     await postDiscussionComment(discussion.id, errorReply);
-    return { replied: true, reason: "analysis_error" };
+    return { replied: true, reason: `analysis_error:${errorInfo.errorType}` };
   }
 
   if (!result.shouldReply || !result.reply) {
@@ -2237,19 +2337,17 @@ export async function handleIssue(
   try {
     result = await analyzeIssue(issue, comments, images);
   } catch (error) {
-    // If analysis fails (e.g., JSON parsing error), post a friendly error message
-    console.error(`[handleIssue] Analysis failed for issue #${issueNumber}:`, error);
+    // Parse the error for a user-friendly message
+    const errorInfo = parseAnthropicError(error);
+    console.error(`[handleIssue] Analysis failed for issue #${issueNumber} (${errorInfo.errorType}):`, error);
+
     const errorReply = `Hey @${issue.user.login}! 🤖
 
-I tried to process your request but ran into a technical issue. This can happen when I try to generate a response that's too complex.
-
-Could you try:
-1. Breaking your request into smaller parts
-2. Or, a moderator can help manually
+${errorInfo.userMessage}
 
 Sorry about that! 🙏`;
     await postIssueComment(issueNumber, errorReply);
-    return { replied: true, reason: "analysis_error" };
+    return { replied: true, reason: `analysis_error:${errorInfo.errorType}` };
   }
 
   if (!result.shouldReply || !result.reply) {
