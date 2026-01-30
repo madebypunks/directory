@@ -89,14 +89,16 @@ export default async function PunkPage({ params }: PunkPageProps) {
                 )}
               </div>
 
-              <div className="bg-white/10 px-6 py-4 text-center backdrop-blur-sm">
-                <div className="text-4xl font-bold text-white">
-                  {projects.length}
+              {projects.length > 0 && (
+                <div className="bg-white/10 px-6 py-4 text-center backdrop-blur-sm">
+                  <div className="text-4xl font-bold text-white">
+                    {projects.length}
+                  </div>
+                  <div className="text-base font-bold uppercase tracking-wider text-white/80 font-pixel">
+                    Work{projects.length !== 1 ? "s" : ""}
+                  </div>
                 </div>
-                <div className="text-base font-bold uppercase tracking-wider text-white/80 font-pixel">
-                  Work{projects.length !== 1 ? "s" : ""}
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </section>
@@ -111,26 +113,28 @@ export default async function PunkPage({ params }: PunkPageProps) {
         )}
 
         {/* Projects List */}
-        <section className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
-          <h2 className="mb-6 text-xl font-bold uppercase tracking-wider">
-            Works
-          </h2>
-          <div>
-            {projects.map((project) => {
-              const collaborators = getProjectCreators(project).filter(
-                (p) => p.id !== punkId
-              );
-              return (
-                <ProjectListItem
-                  key={project.id}
-                  project={project}
-                  collaborators={collaborators}
-                  size="default"
-                />
-              );
-            })}
-          </div>
-        </section>
+        {projects.length > 0 && (
+          <section className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
+            <h2 className="mb-6 text-xl font-bold uppercase tracking-wider">
+              Works
+            </h2>
+            <div>
+              {projects.map((project) => {
+                const collaborators = getProjectCreators(project).filter(
+                  (p) => p.id !== punkId
+                );
+                return (
+                  <ProjectListItem
+                    key={project.id}
+                    project={project}
+                    collaborators={collaborators}
+                    size="default"
+                  />
+                );
+              })}
+            </div>
+          </section>
+        )}
       </main>
 
       <Footer />
