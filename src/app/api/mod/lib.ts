@@ -709,11 +709,14 @@ export async function pushFixesToPR(
 
 export async function getPRComments(prNumber: number): Promise<GitHubComment[]> {
   const octokit = getOctokit();
-  const { data } = await octokit.rest.issues.listComments({
+  // Use paginate to get ALL comments (default is only 30 per page)
+  const data = await octokit.paginate(octokit.rest.issues.listComments, {
     owner: REPO_OWNER,
     repo: REPO_NAME,
     issue_number: prNumber,
+    per_page: 100,
   });
+  console.log(`[getPRComments] Fetched ${data.length} comments for PR #${prNumber}`);
   return data.map(toGitHubComment);
 }
 
@@ -2073,14 +2076,17 @@ export async function getIssueDetails(issueNumber: number): Promise<IssueDetails
   };
 }
 
-// Get issue comments (same API as PR comments)
+// Get issue comments (same API as PR comments) - paginated to get ALL comments
 export async function getIssueComments(issueNumber: number): Promise<IssueComment[]> {
   const octokit = getOctokit();
-  const { data } = await octokit.rest.issues.listComments({
+  // Use paginate to get ALL comments (default is only 30 per page)
+  const data = await octokit.paginate(octokit.rest.issues.listComments, {
     owner: REPO_OWNER,
     repo: REPO_NAME,
     issue_number: issueNumber,
+    per_page: 100,
   });
+  console.log(`[getIssueComments] Fetched ${data.length} comments for issue #${issueNumber}`);
   return data.map(comment => ({
     id: comment.id,
     body: comment.body || "",
@@ -2193,10 +2199,24 @@ async function analyzeIssue(
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const botLogin = `${GITHUB_APP_SLUG}[bot]`;
 
-  // Build conversation context
-  const conversationHistory = comments
+  // Limit conversation history to recent comments to avoid losing focus
+  // Keep last 20 comments to maintain context while staying focused on recent messages
+  const MAX_COMMENTS = 20;
+  const recentComments = comments.length > MAX_COMMENTS
+    ? comments.slice(-MAX_COMMENTS)
+    : comments;
+
+  const skippedCount = comments.length - recentComments.length;
+  const historyPrefix = skippedCount > 0
+    ? `[... ${skippedCount} earlier comments omitted for brevity ...]\n\n`
+    : "";
+
+  // Build conversation context from recent comments
+  const conversationHistory = historyPrefix + recentComments
     .map((c) => `**@${c.user.login}:** ${c.body}`)
     .join("\n\n");
+
+  console.log(`[analyzeIssue] Issue #${issue.number}: ${comments.length} total comments, using last ${recentComments.length}`);
 
   // Check if bot should reply
   const lastComment = comments[comments.length - 1];
@@ -2251,7 +2271,10 @@ ${conversationHistory ? `## Conversation So Far\n${conversationHistory}` : "## T
 ${images.length > 0 ? `## Attached Images\nThe user has uploaded ${images.length} image(s). I've included them above for you to analyze.` : ""}
 
 ## Your Task
-${comments.length === 0 ? "This is a new issue. Welcome the person and help them with their request." : `Respond to the latest message from @${lastComment.user.login}.`}
+${comments.length === 0 ? "This is a new issue. Welcome the person and help them with their request." : `**IMPORTANT:** Respond directly to the LATEST message from @${lastComment.user.login}:
+> ${lastComment.body.split('\n').join('\n> ')}
+
+Pay close attention to what they just said and respond appropriately to THAT specific message.`}
 
 IF THIS IS A SUBMISSION:
 - Check if you have enough info to create a PR
