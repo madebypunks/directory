@@ -24,9 +24,13 @@ export function ProjectThumbnail({
   // Use provided thumbnail, or fetched OG image, or fallback to placeholder
   const imageSrc = thumbnail || ogImageUrl;
 
+  const fallbackClass = mode === "cover"
+    ? "absolute inset-0 flex items-center justify-center bg-punk-blue-light"
+    : "aspect-video flex items-center justify-center bg-punk-blue-light";
+
   if (loading) {
     return (
-      <div className="aspect-video flex animate-pulse items-center justify-center bg-punk-blue-light">
+      <div className={`${fallbackClass} animate-pulse`}>
         <div className="h-12 w-12 border-4 border-white opacity-40" />
       </div>
     );
@@ -35,7 +39,7 @@ export function ProjectThumbnail({
   if (!imageSrc) {
     // Fallback: show project initial
     return (
-      <div className="aspect-video flex items-center justify-center bg-punk-blue-light">
+      <div className={fallbackClass}>
         <span className="text-6xl font-black uppercase text-white text-center opacity-60">
           {projectName.charAt(0)}
         </span>
