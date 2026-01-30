@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Project, Punk } from "@/types";
 import { ProjectThumbnail } from "./ProjectThumbnail";
-import { PunkAvatar } from "./PunkAvatar";
+import { PunkLink } from "./PunkLink";
 import { LinksList } from "./LinksList";
 
 interface ProjectCardProps {
@@ -50,18 +50,17 @@ export function ProjectCard({
 
         {/* Collaborators */}
         {collaborators && collaborators.length > 0 && (
-          <div className="mb-2 flex items-center gap-2 opacity-70">
-            <span>with</span>
+          <div className="mb-2 flex items-center gap-2">
+            <span className="opacity-70">with</span>
             <div className="flex items-center gap-1.5">
               {collaborators.map((collab) => (
-                <Link
+                <PunkLink
                   key={collab.id}
-                  href={`/${collab.id}`}
-                  className="flex items-center gap-1 hover:opacity-100 hover:text-punk-pink transition-all"
-                >
-                  <PunkAvatar punkId={collab.id} size={20} />
-                  <span className="font-medium">{collab.name || `#${collab.id}`}</span>
-                </Link>
+                  punkId={collab.id}
+                  name={collab.name}
+                  size="sm"
+                  variant="ghost"
+                />
               ))}
             </div>
           </div>

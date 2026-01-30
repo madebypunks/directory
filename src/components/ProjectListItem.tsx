@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Project, Punk } from "@/types";
 import { ProjectThumbnail } from "./ProjectThumbnail";
-import { PunkAvatar } from "./PunkAvatar";
+import { PunkLink } from "./PunkLink";
 
 interface ProjectListItemProps {
   project: Project;
@@ -24,12 +24,6 @@ export function ProjectListItem({ project, collaborators, size = "compact" }: Pr
   );
 
   const isDefault = size === "default";
-
-  const handleCollaboratorClick = (e: React.MouseEvent, punkId: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    router.push(`/${punkId}`);
-  };
 
   return (
     <Link
@@ -69,15 +63,14 @@ export function ProjectListItem({ project, collaborators, size = "compact" }: Pr
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <span className="opacity-50">With</span>
             {collaborators.map((collab) => (
-              <span
+              <PunkLink
                 key={collab.id}
-                onClick={(e) => handleCollaboratorClick(e, collab.id)}
-                className="flex items-center whitespace-nowrap bg-foreground/5 hover:bg-foreground/10 border border-transparent hover:border-white/10 transition-colors"
-                style={{ height: 20 }}
-              >
-                <PunkAvatar punkId={collab.id} size={18} />
-                <div className="px-1.5 py-0.5 opacity-70">{collab.name || `#${collab.id}`}</div>
-              </span>
+                punkId={collab.id}
+                name={collab.name}
+                size="xs"
+                variant="subtle"
+                onClick={() => router.push(`/${collab.id}`)}
+              />
             ))}
           </div>
         )}

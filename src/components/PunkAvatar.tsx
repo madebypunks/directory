@@ -20,19 +20,18 @@ export function PunkAvatar({
   noBackground = false,
 }: PunkAvatarProps) {
   return (
-    <div
-      className={`relative overflow-hidden ${noBackground ? "" : "bg-punk-blue-light"} ${className}`}
+    <span
+      className={`relative overflow-hidden inline-block ${noBackground ? "" : "bg-punk-blue-light"} ${className}`}
       style={{ width: size, height: size }}
     >
       <Image
         src={getPunkImageUrl(punkId, noBackground)}
         alt={`CryptoPunk #${punkId}`}
-        width={size}
-        height={size}
-        className="pixelated"
+        fill
+        className="pixelated m-0! border-0! object-cover"
         style={{ imageRendering: "pixelated" }}
         unoptimized
       />
-    </div>
+    </span>
   );
 }

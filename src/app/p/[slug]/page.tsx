@@ -1,8 +1,6 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import Markdown from "react-markdown";
-import { Header, Footer, PunkAvatar, ProjectThumbnail, Button, LinksList, BackButton, CTASection } from "@/components";
+import { Header, Footer, PunkLink, ProjectThumbnail, Button, LinksList, BackButton, CTASection, MarkdownContent } from "@/components";
 import { getProjectById, getAllProjects, getProjectCreators } from "@/data/punks";
 import { generateProjectEditUrl } from "@/lib/github";
 
@@ -120,15 +118,13 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                       <span className="block mb-2 text-white/40">Creator{creators.length>1?"s":""}:</span>
                       <div className="flex flex-wrap gap-2">
                         {creators.map((creator) => (
-                          <Link
+                          <PunkLink
                             key={creator.id}
-                            href={`/${creator.id}`}
-                            className="flex items-center whitespace-nowrap bg-white/10 hover:bg-white/20 border border-transparent hover:border-white/10 transition-colors"
-                            style={{ height: 30 }}
-                          >
-                            <PunkAvatar punkId={creator.id} size={28} className="border-0!" />
-                            <div className="pl-1.5 pr-2 py-1 text-white/80">{creator.name || `#${creator.id}`}</div>
-                          </Link>
+                            punkId={creator.id}
+                            name={creator.name}
+                            size="md"
+                            variant="light"
+                          />
                         ))}
                       </div>
                     </div>
@@ -143,7 +139,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           {project.body && (
             <section className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
               <div className="prose prose-lg max-w-none">
-                <Markdown>{project.body}</Markdown>
+                <MarkdownContent>{project.body}</MarkdownContent>
               </div>
             </section>
           )}

@@ -212,6 +212,18 @@ label[for] {
   color: var(--punk-pink);
 }
 
+/* PunkLink in prose - override default link styles */
+.prose a.punk-link {
+  color: white;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.prose a.punk-link:hover {
+  color: white;
+  text-decoration: underline;
+}
+
 .prose strong {
   font-weight: 700;
   color: var(--foreground);
