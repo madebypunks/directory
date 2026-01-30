@@ -1,16 +1,15 @@
 ---
 name: Understanding CryptoPunks
 description: A comprehensive guide exploring CryptoPunks from art to code to how the marketplace actually works.
-url: https://understanding-cryptopunks.vv.xyz/
+url: https://punks.vv.xyz/
 launchDate: 2024-01-01
 tags:
   - Guide
   - Education
   - Culture
-links:
-  - https://x.com/jalil_eth
 creators:
   - 6980
+thumbnail: /projects/understanding-cryptopunks.png
 ---
 
 Understanding CryptoPunks is a comprehensive guide by jalil.eth that explores everything from a high-level overview of the phenomenon to the actual smart contract code and how the marketplace works. Published in partnership with Visualize Value.
