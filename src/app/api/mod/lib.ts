@@ -1906,3 +1906,347 @@ export function verifyWebhookSignature(payload: string, signature: string | null
     return false;
   }
 }
+
+// =============================================================================
+// ISSUE HANDLING FUNCTIONS
+// =============================================================================
+
+export interface IssueDetails {
+  number: number;
+  title: string;
+  body: string | null;
+  user: { login: string };
+  labels: { name: string }[];
+}
+
+interface IssueComment {
+  id: number;
+  body: string;
+  user: { login: string };
+}
+
+// Get issue details
+export async function getIssueDetails(issueNumber: number): Promise<IssueDetails> {
+  return github(`/issues/${issueNumber}`);
+}
+
+// Get issue comments (same API as PR comments)
+export async function getIssueComments(issueNumber: number): Promise<IssueComment[]> {
+  return github(`/issues/${issueNumber}/comments`);
+}
+
+// Post a comment on an issue
+export async function postIssueComment(issueNumber: number, body: string): Promise<void> {
+  await github(`/issues/${issueNumber}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+}
+
+// Issue-specific system prompt
+const ISSUE_SYSTEM_PROMPT = `${SYSTEM_PROMPT}
+
+YOU ARE NOW IN ISSUE MODE - This is where people submit requests and report issues.
+
+Your role here:
+- Help people with their requests (adding projects, editing profiles, etc.)
+- Answer questions about how to contribute
+- Guide people through the submission process
+- Be friendly, helpful, and patient
+
+ISSUE TYPES YOU'LL SEE:
+1. **Submissions** (label: submission) - Someone wants to add themselves or a project
+   - Collect the info you need and CREATE A PR for them!
+   - For profiles: punk ID, name (optional), links, bio
+   - For projects: name, description, URL, launch date, tags, creator punk IDs
+
+2. **Edit Requests** (labels: edit-request, punk-profile or project)
+   - Someone wants to update an existing entry
+   - Understand what they want changed
+   - CREATE A PR with the changes
+
+3. **General Questions** - Help them out!
+
+IMPORTANT CAPABILITIES:
+- You can CREATE PRs directly from issues!
+- You can EDIT existing files in the repo
+- A human will review and merge your PRs
+- If info is missing, ask politely
+
+IMAGES:
+- If someone uploads an image in the issue, use it as the project thumbnail
+- Images will be passed to you for analysis
+- You can see what's in uploaded screenshots/images
+
+Be conversational but efficient. Don't waste people's time with excessive back-and-forth.`;
+
+// Download images for vision model (returns base64 data URLs)
+async function downloadImagesForVision(imageUrls: string[]): Promise<Anthropic.ImageBlockParam[]> {
+  const images: Anthropic.ImageBlockParam[] = [];
+  const token = await getInstallationToken();
+
+  for (const url of imageUrls.slice(0, 3)) { // Limit to 3 images
+    try {
+      const imageData = await downloadImageAsBase64(url, token);
+      if (imageData) {
+        // Map mime type to Anthropic's expected format
+        let mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp" = "image/png";
+        if (imageData.mimeType.includes("jpeg") || imageData.mimeType.includes("jpg")) {
+          mediaType = "image/jpeg";
+        } else if (imageData.mimeType.includes("gif")) {
+          mediaType = "image/gif";
+        } else if (imageData.mimeType.includes("webp")) {
+          mediaType = "image/webp";
+        }
+
+        images.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: mediaType,
+            data: imageData.base64,
+          },
+        });
+      }
+    } catch (error) {
+      console.error(`Failed to download image ${url}:`, error);
+    }
+  }
+
+  return images;
+}
+
+// Analyze an issue and generate a response
+export interface IssueResponse {
+  summary: string;
+  shouldReply: boolean;
+  reply?: string;
+  createPR?: {
+    title: string;
+    projectSlug?: string;
+    imageUrl?: string;
+    files: { filename: string; content: string }[];
+  };
+}
+
+async function analyzeIssue(
+  issue: IssueDetails,
+  comments: IssueComment[],
+  images: Anthropic.ImageBlockParam[] = []
+): Promise<IssueResponse> {
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const botLogin = `${GITHUB_APP_SLUG}[bot]`;
+
+  // Build conversation context
+  const conversationHistory = comments
+    .map((c) => `**@${c.user.login}:** ${c.body}`)
+    .join("\n\n");
+
+  // Check if bot should reply
+  const lastComment = comments[comments.length - 1];
+  const botIsLastCommenter = lastComment && lastComment.user.login === botLogin;
+
+  if (botIsLastCommenter) {
+    return { summary: "Bot was last commenter, waiting for user", shouldReply: false };
+  }
+
+  // Determine issue type from labels
+  const labelNames = issue.labels.map(l => l.name.toLowerCase());
+  const isSubmission = labelNames.includes("submission");
+  const isEditRequest = labelNames.includes("edit-request");
+  const isPunkEdit = labelNames.includes("punk-profile");
+  const isProjectEdit = labelNames.includes("project");
+
+  const today = new Date().toISOString().split("T")[0];
+
+  const prompt = `${ISSUE_SYSTEM_PROMPT}
+
+TODAY'S DATE: ${today}
+
+## File Formats (for when you create PRs)
+
+### Project files (content/projects/{slug}.md)
+- Filename: lowercase with hyphens (e.g., my-cool-project.md)
+- Required fields:
+  - name: string
+  - description: string (1-2 sentences)
+  - url: string (https://...)
+  - launchDate: string (YYYY-MM-DD)
+  - tags: array of strings
+  - creators: array of numbers (punk IDs, 0-9999)
+- Optional: thumbnail, links, hidden, ded, featured
+
+### Punk files (content/punks/{id}.md)
+- Filename: punk ID number (e.g., 2113.md)
+- Optional: name, links (array of URLs)
+- Body: optional markdown bio
+
+## Issue Details
+- **Number:** #${issue.number}
+- **Title:** ${issue.title}
+- **Author:** @${issue.user.login}
+- **Labels:** ${labelNames.join(", ") || "none"}
+- **Type:** ${isSubmission ? "New Submission" : isEditRequest ? `Edit Request (${isPunkEdit ? "punk profile" : isProjectEdit ? "project" : "unknown"})` : "General"}
+- **Body:**
+${issue.body || "(empty)"}
+
+${conversationHistory ? `## Conversation So Far\n${conversationHistory}` : "## This is a new issue (no comments yet)"}
+
+${images.length > 0 ? `## Attached Images\nThe user has uploaded ${images.length} image(s). I've included them above for you to analyze.` : ""}
+
+## Your Task
+${comments.length === 0 ? "This is a new issue. Welcome the person and help them with their request." : `Respond to the latest message from @${lastComment.user.login}.`}
+
+IF THIS IS A SUBMISSION:
+- Check if you have enough info to create a PR
+- For projects: need name, url, at least one creator punk ID
+- For profiles: need punk ID
+- If you have enough, CREATE THE PR immediately
+- If missing info, ask politely
+
+IF THIS IS AN EDIT REQUEST:
+- Understand what they want changed
+- If clear, CREATE A PR with the changes
+- If unclear, ask for clarification
+
+Respond in JSON:
+{
+  "summary": "1 sentence describing what this issue is about",
+  "shouldReply": true,
+  "reply": "Your response. Be helpful and mention if you created a PR!",
+  "createPR": {
+    "title": "Add [name] to Made By Punks",
+    "projectSlug": "my-project",
+    "imageUrl": "https://...",
+    "files": [
+      { "filename": "content/projects/my-project.md", "content": "---\\nname: ...\\n---" }
+    ]
+  }
+}
+
+The "createPR" field is OPTIONAL - only include when actually creating a PR.
+If you don't have enough info, just reply asking for what's missing.
+
+For spam or off-topic:
+{
+  "summary": "reason",
+  "shouldReply": false
+}`;
+
+  // Build message content with optional images
+  const messageContent: Anthropic.ContentBlockParam[] = [];
+
+  // Add images first if present
+  for (const image of images) {
+    messageContent.push(image);
+  }
+
+  // Add the text prompt
+  messageContent.push({ type: "text", text: prompt });
+
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 2048,
+    messages: [{ role: "user", content: messageContent }],
+  });
+
+  const text = response.content[0];
+  if (text.type !== "text") throw new Error("Unexpected response");
+  const match = text.text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("No JSON in response");
+  return JSON.parse(match[0]);
+}
+
+// Handle an issue event (new issue or new comment)
+export async function handleIssue(
+  issueNumber: number
+): Promise<{ replied: boolean; reason?: string; prCreated?: boolean; prUrl?: string }> {
+  const [issue, comments] = await Promise.all([
+    getIssueDetails(issueNumber),
+    getIssueComments(issueNumber),
+  ]);
+
+  // Extract images from issue body and comments
+  const allText = (issue.body || "") + " " + comments.map(c => c.body).join(" ");
+  const imageUrls = extractImageUrls(allText);
+  console.log(`[handleIssue] Found ${imageUrls.length} images in issue #${issueNumber}`);
+
+  // Download images for vision model
+  const images = await downloadImagesForVision(imageUrls);
+  console.log(`[handleIssue] Downloaded ${images.length} images for vision`);
+
+  const result = await analyzeIssue(issue, comments, images);
+
+  if (!result.shouldReply || !result.reply) {
+    return { replied: false, reason: result.summary };
+  }
+
+  // If Claude wants to create a PR, do it first
+  let prResult: CreatePRFromDiscussionResult | null = null;
+  if (result.createPR && result.createPR.files.length > 0) {
+    const issueUrl = `https://github.com/${REPO_OWNER}/${REPO_NAME}/issues/${issueNumber}`;
+
+    // Determine image URL
+    let imageUrl = result.createPR.imageUrl;
+    if (!imageUrl && imageUrls.length > 0) {
+      imageUrl = imageUrls[0];
+    }
+
+    // Try to extract OG image if no image found
+    if (!imageUrl && result.createPR.projectSlug) {
+      const projectFile = result.createPR.files.find(f =>
+        f.filename.includes(result.createPR!.projectSlug!)
+      );
+      if (projectFile) {
+        const urlMatch = projectFile.content.match(/url:\s*(https?:\/\/[^\s\n]+)/);
+        if (urlMatch) {
+          const ogImage = await extractOGImage(urlMatch[1]);
+          if (ogImage) {
+            imageUrl = ogImage;
+          }
+        }
+      }
+    }
+
+    // Use a fake discussion number based on issue number (negative to distinguish)
+    // This is a bit hacky but works for branch naming
+    const fakeDiscussionNumber = -issueNumber;
+
+    prResult = await createPRFromDiscussion(
+      fakeDiscussionNumber,
+      issueUrl,
+      result.createPR.files,
+      result.createPR.title,
+      issue.user.login,
+      imageUrl,
+      result.createPR.projectSlug
+    );
+
+    // Append PR info to the reply
+    if (prResult.success && prResult.prUrl) {
+      const prAction = prResult.isUpdate ? "updated" : "created";
+      let statusMessage = `\n\n---\n🤖 I've ${prAction} a PR for you: ${prResult.prUrl}`;
+
+      if (prResult.imageStatus === "added") {
+        statusMessage += "\n\n✅ Thumbnail image added successfully!";
+      } else if (prResult.imageStatus === "failed") {
+        statusMessage += `\n\n⚠️ **Note:** I couldn't download the image. You may need to add a thumbnail manually.`;
+      }
+
+      statusMessage += "\n\nA human moderator will review and merge it!";
+      result.reply += statusMessage;
+    } else if (prResult.error) {
+      result.reply += `\n\n---\n⚠️ I tried to create a PR but hit an error: ${prResult.error}\n\nYou might need to submit manually via GitHub.`;
+    }
+  }
+
+  // Post the reply
+  await postIssueComment(issueNumber, result.reply);
+
+  return {
+    replied: true,
+    prCreated: prResult?.success || false,
+    prUrl: prResult?.prUrl,
+  };
+}
