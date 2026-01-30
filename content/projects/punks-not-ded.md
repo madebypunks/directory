@@ -2,7 +2,7 @@
 name: "Punks: Not Ded"
 description: An unofficial companion to the Phaidon book with updated essays, recent news, and additional stats for punk collectors.
 url: https://seanbonner.com/books/punks-not-ded/
-launchDate: 2024-12-01
+launchDate: 2025-06-14
 tags:
   - Book
   - History
