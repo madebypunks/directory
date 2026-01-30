@@ -13,7 +13,7 @@ export default function NotFound() {
             Punk not found
           </p>
           <p className="mt-2 opacity-60">
-            The punk or page you&apos;re looking for doesn&apos;t exist.
+            This page doesn&apos;t exist.
           </p>
           <Link
             href="/"

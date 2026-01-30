@@ -17,7 +17,7 @@ export function Header() {
           </span>
         </Link>
 
-        <nav className="flex items-center gap-4">
+        <nav className="flex items-center gap-2">
           <SearchOverlay items={searchItems} />
           <Link
             href="/who"
@@ -26,10 +26,10 @@ export function Header() {
           >
             <HiUsers className="w-5 h-5" />
           </Link>
-          <Button href="/add" variant="primary" size="sm" className="!hidden sm:!inline-flex">
+          <Button href="/add" variant="primary" size="sm" className="!hidden sm:!inline-flex ml-2">
             + Join
           </Button>
-          <Button href="/add" variant="primary" size="sm" className="sm:!hidden w-9 h-9 p-0 justify-center">
+          <Button href="/add" variant="primary" size="sm" className="sm:!hidden w-9 h-9 p-0 justify-center ml-2">
             +
           </Button>
         </nav>

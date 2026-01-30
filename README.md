@@ -1,15 +1,21 @@
 # Made by Punks
 
-A trustless, community-owned directory of projects built by CryptoPunks holders.
+A trustless, community-owned directory of CryptoPunks holders.
+
+## What is this?
+
+Made by Punks is a place for punk holders to show who they are, what they do, and what they create around the CryptoPunks lore.
+
+**No project required.** If you hold a punk, you belong here.
 
 ## Philosophy
 
-CryptoPunks belong to no one and everyone. This directory exists to celebrate the builders who keep the punk spirit alive.
+CryptoPunks belong to no one and everyone. This directory celebrates the people behind the punks.
 
 **Made by Punks is not a company.** There is no team, no token, no roadmap. It's a public good maintained by the community, for the community.
 
 - **Trustless** - All data lives in markdown files. No database, no backend, no single point of failure.
-- **Permissionless** - Anyone can add their punk profile and projects via pull request.
+- **Permissionless** - Anyone can add their punk profile via pull request.
 - **Decentralized** - Fork it, remix it, make it your own. The code is MIT licensed.
 - **Community-owned** - Maintainers are punk holders who volunteer their time.
 
@@ -21,128 +27,80 @@ This is lore that belongs to everyone.
 madebypunks/
 ├── content/
 │   ├── pages/                    # Static pages (markdown)
-│   │   └── add.md                # "Add Your Project" page content
 │   ├── punks/                    # Punk profiles
 │   │   ├── 2113.md               # One file per punk
-│   │   ├── 8070.md
 │   │   └── ...
-│   └── projects/                 # Projects
+│   └── projects/                 # Works/Projects (optional)
 │       ├── punkcam.md            # One file per project
-│       ├── cryptopunks-app.md
 │       └── ...
 ├── public/
 │   └── projects/                 # Project thumbnail images
 ├── src/
 │   ├── app/                      # Next.js App Router pages
 │   ├── components/               # React components
-│   ├── data/
-│   │   └── punks.ts              # Data loader (reads content/ at build time)
-│   ├── lib/                      # Utilities & constants
-│   └── types/                    # TypeScript types
+│   ├── data/punks.ts             # Data loader (reads content/ at build time)
+│   └── lib/                      # Utilities & constants
 └── README.md
 ```
 
 ## How It Works
 
-1. All punk and project data is stored as **markdown files** in `content/punks/` and `content/projects/`
-2. At build time, `src/data/punks.ts` reads all markdown files and parses the YAML frontmatter
+1. All punk profiles and projects are stored as **markdown files** in `content/`
+2. At build time, the data loader reads all files and parses the YAML frontmatter
 3. Pages are statically generated for each punk and project
 4. No database, no API, no runtime data fetching
 
-## Add Your Punk Profile
+## Add Your Profile
 
-### 1. Fork & Clone
-
-```bash
-git clone https://github.com/YOUR_USERNAME/madebypunks.git
-cd madebypunks
-```
-
-### 2. Create Your Punk File
+### Punk Profile Format
 
 Create `content/punks/YOUR_PUNK_ID.md`:
 
 ```md
 ---
 name: Your Name
-twitter: your_handle
-website: https://your-site.com
+links:
+  - https://x.com/your_handle
+  - https://your-site.com
 ---
 
-Write anything you want here. This is your MySpace page.
+Write anything you want here. This is your space.
 
-Share your story, your vision, whatever. Markdown is supported.
+Share your story, your interests, whatever. Markdown is supported.
 ```
 
-**Fields:**
+That's all you need. No project required.
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `name` | No | Display name |
-| `twitter` | No | Twitter/X handle (without @) |
-| `website` | No | Personal website URL |
+### Project Format (Optional)
 
-The content below the frontmatter is your bio - write whatever you want!
-
-### 3. Add Your Projects
-
-Create `content/projects/your-project-slug.md`:
-
-> **Important:** The filename becomes the URL slug. Make sure it's unique!
+If you've built something, create `content/projects/your-project.md`:
 
 ```md
 ---
 name: My Project
-description: A brief description of what it does.
-thumbnail: /projects/my-project.png
+description: A brief description (1-2 sentences)
 url: https://my-project.com
 launchDate: 2024-01-15
 tags:
-  - Tool
   - Art
+  - Tool
 creators:
   - 2113
-  - 5072
-twitter: project_handle
-github: https://github.com/user/repo
-discord: https://discord.gg/invite
+thumbnail: /projects/my-project.png
+links:
+  - https://x.com/project
 ---
 
-Optional longer description in markdown. Tell the story of your project!
+Optional longer description in markdown.
 ```
 
-**Fields:**
+**Available tags:** Art, Book, Film, Documentary, Music, Photography, Animation, Illustration, Derivative, Generative, History, Guide, Education, Creation, Memes, Fun, Playful, Community, Collector, Marketplace, Explorer, Archive, Tool
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `name` | Yes | Project name |
-| `description` | Yes | Short description (1-2 sentences) |
-| `url` | Yes | Project URL |
-| `launchDate` | Yes | Launch date (YYYY-MM-DD) |
-| `tags` | Yes | Array of tags |
-| `creators` | Yes | Array of punk IDs who built this |
-| `thumbnail` | No | Path to thumbnail (e.g., `/projects/my-project.png`) |
-| `twitter` | No | Project's Twitter handle |
-| `github` | No | GitHub repository URL |
-| `discord` | No | Discord invite URL |
-| `hidden` | No | Set to `true` to hide from listings |
-| `ded` | No | Set to `true` if the project is dead/discontinued |
-
-### 4. Add Thumbnail (Optional)
-
-Place your project image in `public/projects/`:
-
-```bash
-public/projects/my-project.png
-```
-
-Recommended size: **1200x630px** (OG image dimensions).
-
-### 5. Submit PR
+### Submit
 
 ```bash
 git add .
-git commit -m "Add Punk #1234 and projects"
+git commit -m "Add Punk #1234"
 git push origin main
 ```
 
@@ -150,29 +108,28 @@ Then open a pull request.
 
 ## PunkMod - Your AI Assistant
 
-<img src="https://punks.art/api/traits/003-055-020-052?background=v2&format=png" alt="PunkMod" width="96" height="96" />
+<img src="https://punks.art/api/traits/003-055-020-052?background=v2&format=png&size=24" alt="PunkMod" width="96" height="96" style="image-rendering: pixelated;" />
 
-When you open a pull request, **PunkMod** will automatically review your submission. PunkMod is an AI bot that:
+When you open a pull request or start a discussion, **PunkMod** will help you:
 
-- **Reviews your files** - Checks if your submission follows the correct format
-- **Fetches your URLs** - Verifies that your project links are working and legit
-- **Filters scams and spam** - Protects the directory from fake projects, phishing, and bad actors
-- **Ensures relevance** - Makes sure submissions are actually related to CryptoPunks
-- **Suggests fixes** - If something's wrong, PunkMod will tell you exactly what to fix
-- **Has conversations** - You can reply to PunkMod and ask questions
+- **Review your files** - Checks if your submission follows the correct format
+- **Verify your links** - Makes sure URLs are working and legit
+- **Filter spam** - Protects the directory from scams and bad actors
+- **Suggest fixes** - If something's wrong, PunkMod tells you what to fix
+- **Answer questions** - Chat with PunkMod in discussions or PR comments
 
-PunkMod is here to help contributors submit quality data and keep the directory clean. Don't worry if your first submission isn't perfect - PunkMod will guide you through it!
+PunkMod is here to help. Don't worry if your first submission isn't perfect - PunkMod will guide you through it.
 
-> **Note:** PunkMod never approves or merges PRs. A human maintainer always has the final say.
+> **Note:** PunkMod never merges PRs. A human maintainer always has the final say.
 
 ## Multiple Creators
 
-Projects can have multiple creators! Just add all the punk IDs:
+Projects can have multiple creators:
 
 ```yaml
 creators:
-  - 8070  # Matt Hall
-  - 5072  # John Watkinson
+  - 8070
+  - 5072
 ```
 
 The project will appear on both punk profile pages.
@@ -180,24 +137,14 @@ The project will appear on both punk profile pages.
 ## Development
 
 ```bash
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm start
+npm install    # Install dependencies
+npm run dev    # Run development server
+npm run build  # Build for production
 ```
 
 ## Become a Maintainer
 
-Want to help review PRs?
-
-Open an issue titled **"Maintainer Request"** with:
+Want to help review PRs? Join the [discussion](https://github.com/madebypunks/directory/discussions) with:
 
 - Your punk ID
 - Your Twitter/X handle

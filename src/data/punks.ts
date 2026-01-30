@@ -266,11 +266,11 @@ export function getPunksAlphabetically(): AlphabetGroup[] {
     groups.get(letter)!.push(punk);
   }
 
-  // Convert to array and sort by letter (# first, then A-Z)
+  // Convert to array and sort by letter (A-Z, then # at the end)
   return Array.from(groups.entries())
     .sort(([letterA], [letterB]) => {
-      if (letterA === "#") return -1;
-      if (letterB === "#") return 1;
+      if (letterA === "#") return 1;
+      if (letterB === "#") return -1;
       return letterA.localeCompare(letterB);
     })
     .map(([letter, punks]) => ({ letter, punks }));

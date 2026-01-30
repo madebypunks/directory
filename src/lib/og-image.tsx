@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { COLORS } from "./constants";
+import { loadSilkscreenFont, silkscreenFontConfig } from "./fonts";
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -25,16 +26,9 @@ interface ProjectOGImageProps {
   tags?: string[];
 }
 
-function getPunkImageUrl(punkId: number, size: number = 480) {
-  return `https://punks.art/api/punks/${punkId}?format=png&size=${size}&background=v2`;
-}
-
-// Load Silkscreen font from Google Fonts
-async function loadSilkscreenFont(): Promise<ArrayBuffer> {
-  const response = await fetch(
-    "https://fonts.gstatic.com/s/silkscreen/v6/m8JXjfVPf62XiF7kO-i9ULQ.ttf"
-  );
-  return response.arrayBuffer();
+function getPunkImageUrl(punkId: number) {
+  // Use size=240 for OG images since Satori doesn't support image-rendering: pixelated
+  return `https://punks.art/api/punks/${punkId}?format=png&size=240&background=v2`;
 }
 
 export function generateNotFoundImage(options: OGImageOptions): ImageResponse {
@@ -216,10 +210,8 @@ export async function generateOGImage(
         height,
         fonts: [
           {
-            name: "Silkscreen",
+            ...silkscreenFontConfig,
             data: silkscreenFont,
-            style: "normal",
-            weight: 400,
           },
         ],
       }
@@ -514,10 +506,8 @@ export async function generateProjectOGImage(
         height,
         fonts: [
           {
-            name: "Silkscreen",
+            ...silkscreenFontConfig,
             data: silkscreenFont,
-            style: "normal",
-            weight: 400,
           },
         ],
       }

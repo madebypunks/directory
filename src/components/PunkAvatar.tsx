@@ -7,9 +7,10 @@ interface PunkAvatarProps {
   noBackground?: boolean;
 }
 
-export function getPunkImageUrl(punkId: number, size: number = 24, noBackground: boolean = false) {
+export function getPunkImageUrl(punkId: number, noBackground: boolean = false) {
+  // Always use size=24, CSS pixelated rendering will scale it up
   const bgParam = noBackground ? "" : "&background=v2";
-  return `https://punks.art/api/punks/${punkId}?format=png&size=${size}${bgParam}`;
+  return `https://punks.art/api/punks/${punkId}?format=png&size=24${bgParam}`;
 }
 
 export function PunkAvatar({
@@ -18,16 +19,13 @@ export function PunkAvatar({
   className = "",
   noBackground = false,
 }: PunkAvatarProps) {
-  // Use size 24 for the API (it will be scaled up)
-  const apiSize = 24;
-
   return (
     <div
       className={`relative overflow-hidden ${noBackground ? "" : "bg-punk-blue-light"} ${className}`}
       style={{ width: size, height: size }}
     >
       <Image
-        src={getPunkImageUrl(punkId, apiSize, noBackground)}
+        src={getPunkImageUrl(punkId, noBackground)}
         alt={`CryptoPunk #${punkId}`}
         width={size}
         height={size}

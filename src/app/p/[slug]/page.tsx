@@ -2,8 +2,9 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Markdown from "react-markdown";
-import { Header, Footer, PunkAvatar, ProjectThumbnail, Button, LinksList, BackButton } from "@/components";
+import { Header, Footer, PunkAvatar, ProjectThumbnail, Button, LinksList, BackButton, CTASection } from "@/components";
 import { getProjectById, getAllProjects, getProjectCreators } from "@/data/punks";
+import { generateProjectEditUrl } from "@/lib/github";
 
 interface ProjectPageProps {
   params: Promise<{ slug: string }>;
@@ -66,9 +67,10 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     <div className="flex min-h-screen flex-col">
       <Header />
 
-      <main className="flex-1">
-        {/* Project Header */}
-        <section className="bg-punk-blue">
+      <main className="flex-1 flex flex-col">
+        <div className="flex-1">
+          {/* Project Header */}
+          <section className="bg-punk-blue">
           <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
             <BackButton className="mb-6" />
 
@@ -137,14 +139,26 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           </div>
         </section>
 
-        {/* Content */}
-        {project.body && (
-          <section className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
-            <div className="prose prose-lg max-w-none">
-              <Markdown>{project.body}</Markdown>
-            </div>
-          </section>
-        )}
+          {/* Content */}
+          {project.body && (
+            <section className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
+              <div className="prose prose-lg max-w-none">
+                <Markdown>{project.body}</Markdown>
+              </div>
+            </section>
+          )}
+        </div>
+
+        <CTASection
+          title="Know more about this project?"
+          description="Help us document the work of CryptoPunks holders. Anyone can contribute."
+          buttonLabel="Contribute →"
+          href={generateProjectEditUrl({
+            projectId: project.id,
+            name: project.name,
+          })}
+          external
+        />
       </main>
 
       <Footer />
