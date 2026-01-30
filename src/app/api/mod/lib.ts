@@ -4,9 +4,17 @@ import crypto from "crypto";
 // Helper to repair and parse JSON from Claude's response
 // Handles common issues like unescaped newlines in strings
 function parseClaudeJSON<T>(text: string): T {
+  console.log("[parseClaudeJSON] Raw response length:", text.length);
+
+  // Remove markdown code blocks if present (```json ... ``` or ``` ... ```)
+  let cleanedText = text.replace(/```(?:json)?\s*([\s\S]*?)```/g, "$1").trim();
+
   // Extract JSON from the response
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error("No JSON in response");
+  const match = cleanedText.match(/\{[\s\S]*\}/);
+  if (!match) {
+    console.error("[parseClaudeJSON] No JSON found in response. First 500 chars:", text.substring(0, 500));
+    throw new Error("No JSON in response");
+  }
 
   const jsonStr = match[0];
 
@@ -14,7 +22,10 @@ function parseClaudeJSON<T>(text: string): T {
   try {
     return JSON.parse(jsonStr);
   } catch (initialError) {
-    console.log("[parseClaudeJSON] Initial parse failed, attempting repair...");
+    console.log("[parseClaudeJSON] Initial parse failed:", (initialError as Error).message);
+    console.log("[parseClaudeJSON] JSON string length:", jsonStr.length);
+    console.log("[parseClaudeJSON] First 300 chars:", jsonStr.substring(0, 300));
+    console.log("[parseClaudeJSON] Attempting repair...");
 
     // Process character by character to escape newlines inside strings
     let repaired = "";
