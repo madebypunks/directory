@@ -3,14 +3,12 @@ name: 'CryptoPunks: Free to Claim'
 description: >-
   The definitive 800+ page book on CryptoPunks published by Phaidon, featuring
   essays, interviews, and all 10,000 punks.
-url: 'https://seanbonner.com/books/cryptopunks-free-to-claim/'
+url: 'https://www.phaidon.com/en-us/products/cryptopunks-free-to-claim'
 launchDate: 2024-12-01T00:00:00.000Z
 tags:
   - Book
   - History
   - Art
-links:
-  - https://x.com/seanbonner
 creators:
   - 4736
   - 98
