@@ -37,7 +37,7 @@ export function ProjectListItem({ project, collaborators, size = "compact" }: Pr
       className={`group flex gap-4 hover:bg-foreground/2 transition-colors -mx-2 px-2 rounded ${isDefault ? 'py-4' : 'py-3'}`}
     >
       {/* Thumbnail */}
-      <div className={`relative shrink-0 overflow-hidden bg-punk-blue ${isDefault ? 'w-28 h-20 sm:w-36 sm:h-24' : 'w-20 h-14 sm:w-28 sm:h-20'}`}>
+      <div className={`relative shrink-0 overflow-hidden bg-punk-blue rounded-lg ${isDefault ? 'w-28 h-28 sm:w-32 sm:h-32' : 'w-16 h-16 sm:w-20 sm:h-20'}`}>
         <ProjectThumbnail
           projectUrl={project.url}
           projectName={project.name}
@@ -60,7 +60,7 @@ export function ProjectListItem({ project, collaborators, size = "compact" }: Pr
           </time>
         </div>
 
-        <p className={`mt-1 opacity-70 leading-snug ${isDefault ? 'text-base line-clamp-2' : 'text-base line-clamp-1 sm:line-clamp-2'}`}>
+        <p className={`mt-1 opacity-70 leading-snug ${isDefault ? 'text-base line-clamp-2' : 'text-base line-clamp-2'}`}>
           {project.description}
         </p>
 
