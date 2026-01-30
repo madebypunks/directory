@@ -2422,3 +2422,61 @@ Sorry about that! 🙏`;
     prUrl: prResult?.prUrl,
   };
 }
+
+// Handle when a PR created by the bot is merged
+export async function handlePRMerged(prNumber: number): Promise<{ notified: boolean; target?: string; closed?: boolean }> {
+  // Get PR details to find the linked issue/discussion
+  const pr = await getPRDetails(prNumber);
+  const prBody = pr.body || "";
+
+  // Try to find linked discussion/issue (format: "[Discussion #-123](...)" for issues, "[Discussion #123](...)" for discussions)
+  // Note: We use negative numbers for issues in the branch name hack
+  const discussionMatch = prBody.match(/\[Discussion #(-?\d+)\]/i);
+
+  if (!discussionMatch) {
+    console.log(`[handlePRMerged] No linked discussion/issue found in PR #${prNumber}`);
+    return { notified: false };
+  }
+
+  const linkedNumber = parseInt(discussionMatch[1], 10);
+
+  // Negative numbers are actually issues (our hack from createPRFromDiscussion)
+  if (linkedNumber < 0) {
+    const issueNumber = Math.abs(linkedNumber);
+    console.log(`[handlePRMerged] PR #${prNumber} was linked to issue #${issueNumber}`);
+
+    const message = `🎉 **Great news!** Your changes have been merged and are now live on the site!
+
+PR #${prNumber} was just merged. Thanks for contributing to Made by Punks! ✨`;
+
+    await postIssueComment(issueNumber, message);
+
+    // Close the issue
+    try {
+      await github(`repos/${REPO_OWNER}/${REPO_NAME}/issues/${issueNumber}`, {
+        method: "PATCH",
+        body: JSON.stringify({ state: "closed" }),
+      });
+      return { notified: true, target: `issue #${issueNumber}`, closed: true };
+    } catch (error) {
+      console.error(`[handlePRMerged] Failed to close issue #${issueNumber}:`, error);
+      return { notified: true, target: `issue #${issueNumber}`, closed: false };
+    }
+  } else {
+    // Real discussion
+    console.log(`[handlePRMerged] PR #${prNumber} was linked to discussion #${linkedNumber}`);
+
+    try {
+      const { discussion } = await getDiscussion(linkedNumber);
+      const message = `🎉 **Great news!** Your changes have been merged and are now live on the site!
+
+PR #${prNumber} was just merged. Thanks for contributing to Made by Punks! ✨`;
+
+      await postDiscussionComment(discussion.id, message);
+      return { notified: true, target: `discussion #${linkedNumber}` };
+    } catch (error) {
+      console.error(`[handlePRMerged] Failed to notify discussion #${linkedNumber}:`, error);
+      return { notified: false };
+    }
+  }
+}

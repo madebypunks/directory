@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyWebhookSignature, reviewPR, getPRComments, handleDiscussion, handleIssue } from "../lib";
+import { verifyWebhookSignature, reviewPR, getPRComments, handleDiscussion, handleIssue, handlePRMerged } from "../lib";
 
 const BOT_LOGIN = `${process.env.GITHUB_APP_SLUG || "punkmodbot"}[bot]`;
 
@@ -9,6 +9,7 @@ interface PullRequestEvent {
     number: number;
     title: string;
     state: string;
+    merged: boolean;
     user: { login: string };
   };
 }
@@ -105,14 +106,29 @@ export async function POST(request: NextRequest) {
 
   // Handle pull_request events
   if (event === "pull_request" && isPullRequestEvent(payload)) {
-    // Skip PRs created by the bot itself (avoid infinite loops)
+    const prNumber = payload.pull_request.number;
+
+    // Handle PR merged - notify the original issue/discussion
+    if (payload.action === "closed" && payload.pull_request.merged) {
+      // Only process bot PRs for merge notifications
+      if (payload.pull_request.user.login === BOT_LOGIN) {
+        try {
+          const result = await handlePRMerged(prNumber);
+          return NextResponse.json({ event: "pull_request", action: "merged", pr: prNumber, ...result });
+        } catch (error) {
+          console.error(`Error handling merged PR #${prNumber}:`, error);
+          return NextResponse.json({ error: "Failed to handle merged PR", pr: prNumber }, { status: 500 });
+        }
+      }
+      return NextResponse.json({ event: "pull_request", action: "merged", skipped: true, reason: "not_bot_pr" });
+    }
+
+    // Skip PRs created by the bot itself for review (avoid infinite loops)
     if (payload.pull_request.user.login === BOT_LOGIN) {
       return NextResponse.json({ event: "pull_request", skipped: true, reason: "bot_pr" });
     }
 
     if (payload.action === "opened" || payload.action === "synchronize") {
-      const prNumber = payload.pull_request.number;
-
       try {
         const result = await reviewPR(prNumber);
         return NextResponse.json({ event: "pull_request", action: payload.action, pr: prNumber, ...result });
