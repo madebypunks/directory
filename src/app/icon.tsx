@@ -1,7 +1,6 @@
 import { ImageResponse } from "next/og";
 import { COLORS } from "@/lib/constants";
-
-export const runtime = "edge";
+import { loadSilkscreenFont, silkscreenFontConfig } from "@/lib/fonts";
 
 export const size = {
   width: 32,
@@ -9,7 +8,9 @@ export const size = {
 };
 export const contentType = "image/png";
 
-export default function Icon() {
+export default async function Icon() {
+  const silkscreenFont = await loadSilkscreenFont();
+
   return new ImageResponse(
     (
       <div
@@ -24,10 +25,10 @@ export default function Icon() {
       >
         <div
           style={{
+            fontFamily: "Silkscreen",
             fontSize: 20,
-            fontWeight: 900,
+            fontWeight: 400,
             color: "white",
-            textShadow: "1px 1px 0 #000",
           }}
         >
           P
@@ -36,6 +37,12 @@ export default function Icon() {
     ),
     {
       ...size,
+      fonts: [
+        {
+          ...silkscreenFontConfig,
+          data: silkscreenFont,
+        },
+      ],
     }
   );
 }
