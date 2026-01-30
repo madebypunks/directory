@@ -1900,7 +1900,24 @@ export async function handleDiscussion(
 ): Promise<{ replied: boolean; reason?: string; prCreated?: boolean; prUrl?: string }> {
   const { discussion, comments } = await getDiscussion(discussionNumber);
 
-  const result = await analyzeDiscussion(discussion, comments);
+  let result: DiscussionResponse;
+  try {
+    result = await analyzeDiscussion(discussion, comments);
+  } catch (error) {
+    // If analysis fails (e.g., JSON parsing error), post a friendly error message
+    console.error(`[handleDiscussion] Analysis failed for discussion #${discussionNumber}:`, error);
+    const errorReply = `Hey @${discussion.author.login}! 🤖
+
+I tried to process your request but ran into a technical issue. This can happen when I try to generate a response that's too complex.
+
+Could you try:
+1. Breaking your request into smaller parts
+2. Or, a moderator can help manually
+
+Sorry about that! 🙏`;
+    await postDiscussionComment(discussion.id, errorReply);
+    return { replied: true, reason: "analysis_error" };
+  }
 
   if (!result.shouldReply || !result.reply) {
     return { replied: false, reason: result.summary };
@@ -2292,7 +2309,24 @@ export async function handleIssue(
   const images = await downloadImagesForVision(imageUrls);
   console.log(`[handleIssue] Downloaded ${images.length} images for vision`);
 
-  const result = await analyzeIssue(issue, comments, images);
+  let result: IssueResponse;
+  try {
+    result = await analyzeIssue(issue, comments, images);
+  } catch (error) {
+    // If analysis fails (e.g., JSON parsing error), post a friendly error message
+    console.error(`[handleIssue] Analysis failed for issue #${issueNumber}:`, error);
+    const errorReply = `Hey @${issue.user.login}! 🤖
+
+I tried to process your request but ran into a technical issue. This can happen when I try to generate a response that's too complex.
+
+Could you try:
+1. Breaking your request into smaller parts
+2. Or, a moderator can help manually
+
+Sorry about that! 🙏`;
+    await postIssueComment(issueNumber, errorReply);
+    return { replied: true, reason: "analysis_error" };
+  }
 
   if (!result.shouldReply || !result.reply) {
     return { replied: false, reason: result.summary };
