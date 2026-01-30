@@ -1,233 +1,197 @@
-import { NextRequest, NextResponse } from "next/server";
-import { verifyWebhookSignature, reviewPR, getPRComments, handleDiscussion, handleIssue } from "../lib";
+import { NextRequest, NextResponse } from 'next/server';
+import { Octokit } from '@octokit/rest';
+import { createAppAuth } from '@octokit/auth-app';
 
-const BOT_LOGIN = `${process.env.GITHUB_APP_SLUG || "punkmodbot"}[bot]`;
+const octokit = new Octokit({
+  authStrategy: createAppAuth,
+  auth: {
+    appId: process.env.GITHUB_APP_ID!,
+    privateKey: process.env.GITHUB_PRIVATE_KEY!,
+    installationId: process.env.GITHUB_INSTALLATION_ID!,
+  },
+});
 
-interface PullRequestEvent {
-  action: string;
-  pull_request: {
-    number: number;
-    title: string;
-    state: string;
-  };
-}
-
-interface IssuesEvent {
-  action: string;
-  issue: {
-    number: number;
-    title: string;
-    body: string | null;
-    user: { login: string };
-    pull_request?: { url: string }; // If present, this is a PR not an issue
-  };
-}
-
-interface IssueCommentEvent {
-  action: string;
-  issue: {
-    number: number;
-    pull_request?: { url: string };
-  };
-  comment: {
-    body: string;
-    user: { login: string };
-  };
-}
-
-interface DiscussionEvent {
-  action: string;
-  discussion: {
-    number: number;
-    title: string;
-    body: string;
-  };
-}
-
-interface DiscussionCommentEvent {
-  action: string;
-  discussion: {
-    number: number;
-    title: string;
-  };
-  comment: {
-    body: string;
-    user: { login: string };
-  };
-}
-
-type WebhookEvent = PullRequestEvent | IssuesEvent | IssueCommentEvent | DiscussionEvent | DiscussionCommentEvent;
-
-function isPullRequestEvent(event: WebhookEvent): event is PullRequestEvent {
-  return "pull_request" in event && !("issue" in event);
-}
-
-function isIssuesEvent(event: WebhookEvent): event is IssuesEvent {
-  // Issues event has "issue" but no "comment" field
-  return "issue" in event && !("comment" in event);
-}
-
-function isIssueCommentEvent(event: WebhookEvent): event is IssueCommentEvent {
-  return "comment" in event && "issue" in event;
-}
-
-function isDiscussionEvent(event: WebhookEvent): event is DiscussionEvent {
-  return "discussion" in event && !("comment" in event);
-}
-
-function isDiscussionCommentEvent(event: WebhookEvent): event is DiscussionCommentEvent {
-  return "discussion" in event && "comment" in event;
-}
+const owner = 'madebypunks';
+const repo = 'directory';
 
 export async function POST(request: NextRequest) {
-  const appId = process.env.GITHUB_APP_ID;
-  const installationId = process.env.GITHUB_APP_INSTALLATION_ID;
-  const privateKey = process.env.GITHUB_APP_PRIVATE_KEY;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
-
-  if (!appId || !installationId || !privateKey || !anthropicKey) {
-    return NextResponse.json({ error: "Missing env vars" }, { status: 500 });
-  }
-
-  const rawBody = await request.text();
-  const signature = request.headers.get("x-hub-signature-256");
-
-  if (webhookSecret && !verifyWebhookSignature(rawBody, signature)) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-  }
-
-  const event = request.headers.get("x-github-event");
-  const payload: WebhookEvent = JSON.parse(rawBody);
-
-  console.log(`[webhook] Received event: ${event}, action: ${(payload as { action?: string }).action}`);
-
-  // Handle pull_request events
-  if (event === "pull_request" && isPullRequestEvent(payload)) {
-    if (payload.action === "opened" || payload.action === "synchronize") {
-      const prNumber = payload.pull_request.number;
-
-      try {
-        const result = await reviewPR(prNumber);
-        return NextResponse.json({ event: "pull_request", action: payload.action, pr: prNumber, ...result });
-      } catch (error) {
-        console.error(`Error reviewing PR #${prNumber}:`, error);
-        return NextResponse.json({ error: "Failed to review PR", pr: prNumber }, { status: 500 });
-      }
+  try {
+    const body = await request.json();
+    
+    if (body.action === 'createPR') {
+      return await createPullRequest(body);
     }
-
-    return NextResponse.json({ event: "pull_request", action: payload.action, skipped: true });
+    
+    if (body.action === 'updatePR') {
+      return await updatePullRequest(body);
+    }
+    
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
+}
 
-  // Handle issues events (new issue opened or edited)
-  if (event === "issues" && isIssuesEvent(payload)) {
-    // Skip if this is actually a PR (issues API also fires for PRs)
-    if (payload.issue.pull_request) {
-      return NextResponse.json({ event: "issues", skipped: true, reason: "is_pull_request" });
-    }
-
-    if (payload.action !== "opened" && payload.action !== "edited") {
-      return NextResponse.json({ event: "issues", action: payload.action, skipped: true });
-    }
-
-    const issueNumber = payload.issue.number;
-
+async function createPullRequest(data: any) {
+  const { title, files, imageUrl } = data;
+  
+  // Create a new branch
+  const timestamp = Date.now();
+  const branchName = `punkmodbot-${timestamp}`;
+  
+  // Get the default branch ref
+  const { data: defaultBranch } = await octokit.rest.repos.get({
+    owner,
+    repo,
+  });
+  
+  const { data: mainRef } = await octokit.rest.git.getRef({
+    owner,
+    repo,
+    ref: `heads/${defaultBranch.default_branch}`,
+  });
+  
+  // Create new branch
+  await octokit.rest.git.createRef({
+    owner,
+    repo,
+    ref: `refs/heads/${branchName}`,
+    sha: mainRef.object.sha,
+  });
+  
+  // Handle image upload if present
+  if (imageUrl && data.projectSlug) {
     try {
-      const result = await handleIssue(issueNumber);
-      return NextResponse.json({ event: "issues", action: payload.action, issue: issueNumber, ...result });
-    } catch (error) {
-      console.error(`Error handling issue #${issueNumber}:`, error);
-      return NextResponse.json({ error: "Failed to handle issue", issue: issueNumber }, { status: 500 });
+      const imageResponse = await fetch(imageUrl);
+      const imageBuffer = await imageResponse.arrayBuffer();
+      const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+      
+      // Upload image to public/projects/
+      await octokit.rest.repos.createOrUpdateFileContents({
+        owner,
+        repo,
+        path: `public/projects/${data.projectSlug}.png`,
+        message: `Add thumbnail for ${data.projectSlug}`,
+        content: imageBase64,
+        branch: branchName,
+      });
+    } catch (imageError) {
+      console.error('Error uploading image:', imageError);
     }
   }
+  
+  // Create/update files
+  for (const file of files) {
+    await octokit.rest.repos.createOrUpdateFileContents({
+      owner,
+      repo,
+      path: file.filename,
+      message: `Update ${file.filename}`,
+      content: Buffer.from(file.content).toString('base64'),
+      branch: branchName,
+    });
+  }
+  
+  // Create pull request
+  const { data: pr } = await octokit.rest.pulls.create({
+    owner,
+    repo,
+    title,
+    head: branchName,
+    base: defaultBranch.default_branch,
+    body: 'Created by PunkModBot 🤖',
+  });
+  
+  return NextResponse.json({ 
+    success: true, 
+    pullRequest: pr.html_url,
+    number: pr.number 
+  });
+}
 
-  // Handle issue_comment events (for both PRs and standalone issues)
-  if (event === "issue_comment" && isIssueCommentEvent(payload)) {
-    if (payload.action !== "created") {
-      return NextResponse.json({ event: "issue_comment", skipped: true, reason: "not_created" });
-    }
-
-    // Ignore comments from the bot itself (avoid infinite loops)
-    if (payload.comment.user.login === BOT_LOGIN) {
-      return NextResponse.json({ event: "issue_comment", skipped: true, reason: "bot_comment" });
-    }
-
-    const issueNumber = payload.issue.number;
-    const isPR = !!payload.issue.pull_request;
-
-    if (isPR) {
-      // Handle PR comment
-      const comments = await getPRComments(issueNumber);
-      const botHasCommented = comments.some((c) => c.user.login === BOT_LOGIN);
-
-      // If bot hasn't commented yet, only respond if mentioned
-      if (!botHasCommented) {
-        const commentBody = payload.comment.body.toLowerCase();
-        const mentionsBot = commentBody.includes("@punkmodbot") || commentBody.includes("punkmodbot");
-        if (!mentionsBot) {
-          return NextResponse.json({ event: "issue_comment", skipped: true, reason: "not_participating" });
+async function updatePullRequest(data: any) {
+  const { prNumber, files, imageUrl, projectSlug } = data;
+  
+  // Get the PR details to get the branch name
+  const { data: pr } = await octokit.rest.pulls.get({
+    owner,
+    repo,
+    pull_number: prNumber,
+  });
+  
+  const branchName = pr.head.ref;
+  
+  // Handle image upload if present
+  if (imageUrl && projectSlug) {
+    try {
+      const imageResponse = await fetch(imageUrl);
+      const imageBuffer = await imageResponse.arrayBuffer();
+      const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+      
+      // Check if image already exists
+      let imageSha;
+      try {
+        const { data: existingImage } = await octokit.rest.repos.getContent({
+          owner,
+          repo,
+          path: `public/projects/${projectSlug}.png`,
+          ref: branchName,
+        });
+        if (!Array.isArray(existingImage)) {
+          imageSha = existingImage.sha;
         }
-      }
-
-      try {
-        const result = await reviewPR(issueNumber, true); // Force re-review
-        return NextResponse.json({ event: "issue_comment", action: "re_review", pr: issueNumber, ...result });
       } catch (error) {
-        console.error(`Error re-reviewing PR #${issueNumber}:`, error);
-        return NextResponse.json({ error: "Failed to re-review PR", pr: issueNumber }, { status: 500 });
+        // Image doesn't exist, that's fine
       }
-    } else {
-      // Handle standalone issue comment - always respond to issue comments
-      console.log(`[webhook] Handling issue comment on #${issueNumber}`);
-
-      try {
-        const result = await handleIssue(issueNumber);
-        return NextResponse.json({ event: "issue_comment", action: "reply", issue: issueNumber, ...result });
-      } catch (error) {
-        console.error(`Error replying to issue #${issueNumber}:`, error);
-        return NextResponse.json({ error: "Failed to reply to issue", issue: issueNumber }, { status: 500 });
+      
+      // Upload/update image
+      await octokit.rest.repos.createOrUpdateFileContents({
+        owner,
+        repo,
+        path: `public/projects/${projectSlug}.png`,
+        message: `Update thumbnail for ${projectSlug}`,
+        content: imageBase64,
+        branch: branchName,
+        sha: imageSha,
+      });
+    } catch (imageError) {
+      console.error('Error updating image:', imageError);
+    }
+  }
+  
+  // Update files
+  for (const file of files) {
+    // Get current file SHA if it exists
+    let fileSha;
+    try {
+      const { data: existingFile } = await octokit.rest.repos.getContent({
+        owner,
+        repo,
+        path: file.filename,
+        ref: branchName,
+      });
+      if (!Array.isArray(existingFile)) {
+        fileSha = existingFile.sha;
       }
-    }
-  }
-
-  // Handle discussion events (new discussion created)
-  if (event === "discussion" && isDiscussionEvent(payload)) {
-    if (payload.action !== "created") {
-      return NextResponse.json({ event: "discussion", action: payload.action, skipped: true });
-    }
-
-    const discussionNumber = payload.discussion.number;
-
-    try {
-      const result = await handleDiscussion(discussionNumber);
-      return NextResponse.json({ event: "discussion", action: "created", discussion: discussionNumber, ...result });
     } catch (error) {
-      console.error(`Error handling discussion #${discussionNumber}:`, error);
-      return NextResponse.json({ error: "Failed to handle discussion", discussion: discussionNumber }, { status: 500 });
+      // File doesn't exist, that's fine
     }
+    
+    await octokit.rest.repos.createOrUpdateFileContents({
+      owner,
+      repo,
+      path: file.filename,
+      message: `Update ${file.filename}`,
+      content: Buffer.from(file.content).toString('base64'),
+      branch: branchName,
+      sha: fileSha,
+    });
   }
-
-  // Handle discussion_comment events (someone replied in a discussion)
-  if (event === "discussion_comment" && isDiscussionCommentEvent(payload)) {
-    if (payload.action !== "created") {
-      return NextResponse.json({ event: "discussion_comment", action: payload.action, skipped: true });
-    }
-
-    // Ignore comments from the bot itself (avoid infinite loops)
-    if (payload.comment.user.login === BOT_LOGIN) {
-      return NextResponse.json({ event: "discussion_comment", skipped: true, reason: "bot_comment" });
-    }
-
-    const discussionNumber = payload.discussion.number;
-
-    try {
-      const result = await handleDiscussion(discussionNumber);
-      return NextResponse.json({ event: "discussion_comment", action: "reply", discussion: discussionNumber, ...result });
-    } catch (error) {
-      console.error(`Error replying to discussion #${discussionNumber}:`, error);
-      return NextResponse.json({ error: "Failed to reply to discussion", discussion: discussionNumber }, { status: 500 });
-    }
-  }
-
-  return NextResponse.json({ event, skipped: true, reason: "event_not_supported" });
+  
+  return NextResponse.json({ 
+    success: true, 
+    pullRequest: pr.html_url,
+    updated: true
+  });
 }
