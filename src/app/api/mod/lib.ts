@@ -1,5 +1,20 @@
 import Anthropic from "@anthropic-ai/sdk";
 import crypto from "crypto";
+import { Octokit } from "octokit";
+import { createAppAuth } from "@octokit/auth-app";
+
+// Derive types from Octokit methods
+type OctokitInstance = InstanceType<typeof Octokit>;
+type PullsListResponse = Awaited<ReturnType<OctokitInstance["rest"]["pulls"]["list"]>>;
+type PullsGetResponse = Awaited<ReturnType<OctokitInstance["rest"]["pulls"]["get"]>>;
+type IssuesGetResponse = Awaited<ReturnType<OctokitInstance["rest"]["issues"]["get"]>>;
+type IssuesListCommentsResponse = Awaited<ReturnType<OctokitInstance["rest"]["issues"]["listComments"]>>;
+
+// Export derived types for external use
+export type GitHubPullRequest = PullsListResponse["data"][number];
+export type GitHubPullRequestDetails = PullsGetResponse["data"];
+export type GitHubIssue = IssuesGetResponse["data"];
+export type GitHubIssueComment = IssuesListCommentsResponse["data"][number];
 
 // Helper to repair and parse JSON from Claude's response
 // Handles common issues like unescaped newlines in strings
@@ -7,7 +22,7 @@ function parseClaudeJSON<T>(text: string): T {
   console.log("[parseClaudeJSON] Raw response length:", text.length);
 
   // Remove markdown code blocks if present (```json ... ``` or ``` ... ```)
-  let cleanedText = text.replace(/```(?:json)?\s*([\s\S]*?)```/g, "$1").trim();
+  const cleanedText = text.replace(/```(?:json)?\s*([\s\S]*?)```/g, "$1").trim();
 
   // Extract JSON from the response
   const match = cleanedText.match(/\{[\s\S]*\}/);
@@ -150,8 +165,29 @@ function getPrivateKey(): string {
   return Buffer.from(key, "base64").toString("utf-8");
 }
 
-// Cache for installation token (expires after 1 hour)
-let cachedToken: { token: string; expiresAt: number } | null = null;
+// Cached Octokit instance (with app authentication)
+let cachedOctokit: Octokit | null = null;
+
+function getOctokit(): Octokit {
+  if (cachedOctokit) return cachedOctokit;
+
+  if (!GITHUB_APP_ID || !GITHUB_APP_INSTALLATION_ID) {
+    throw new Error("Missing GITHUB_APP_ID or GITHUB_APP_INSTALLATION_ID");
+  }
+
+  const privateKey = getPrivateKey();
+
+  cachedOctokit = new Octokit({
+    authStrategy: createAppAuth,
+    auth: {
+      appId: GITHUB_APP_ID,
+      privateKey,
+      installationId: Number(GITHUB_APP_INSTALLATION_ID),
+    },
+  });
+
+  return cachedOctokit;
+}
 
 const SYSTEM_PROMPT = `You are PunkModBot, the AUTONOMOUS MANAGER of Made By Punks - a community directory of CryptoPunks holders.
 
@@ -319,12 +355,10 @@ export interface ReviewResult {
   suspiciousReasons?: string[];
 }
 
-export interface PRDetails {
-  number: number;
-  title: string;
-  body: string | null;
+// PRDetails - uses Octokit type with Pick for clarity
+export type PRDetails = Pick<GitHubPullRequestDetails, "number" | "title" | "body"> & {
   user: { login: string };
-}
+};
 
 // Discussion types
 export interface DiscussionDetails {
@@ -357,9 +391,21 @@ export interface DiscussionResponse {
   };
 }
 
+// GitHubComment - simplified view of issue/PR comments
 interface GitHubComment {
   user: { login: string; type: string };
   body: string;
+}
+
+// Helper to convert Octokit comment to our simplified type
+function toGitHubComment(comment: GitHubIssueComment): GitHubComment {
+  return {
+    user: {
+      login: comment.user?.login || "unknown",
+      type: comment.user?.type || "User",
+    },
+    body: comment.body || "",
+  };
 }
 
 // URL content fetching via Jina Reader
@@ -446,124 +492,26 @@ async function fetchAllUrls(files: PRFile[]): Promise<UrlCheckResult[]> {
   return results;
 }
 
-// Generate JWT for GitHub App authentication
-function generateJWT(): string {
-  if (!GITHUB_APP_ID) {
-    throw new Error("Missing GITHUB_APP_ID");
-  }
-
-  const privateKey = getPrivateKey();
-  console.log("Private key starts with:", privateKey.substring(0, 40));
-  console.log("Private key ends with:", privateKey.substring(privateKey.length - 40));
-
-  const now = Math.floor(Date.now() / 1000);
-  const payload = {
-    iat: now - 60, // Issued 60 seconds ago (clock drift)
-    exp: now + 600, // Expires in 10 minutes
-    iss: GITHUB_APP_ID,
-  };
-
-  // Base64url encode
-  const base64url = (str: string) =>
-    Buffer.from(str).toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-
-  const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const body = base64url(JSON.stringify(payload));
-  const unsignedToken = `${header}.${body}`;
-
-  // Sign with private key
-  const sign = crypto.createSign("RSA-SHA256");
-  sign.update(unsignedToken);
-  const signature = sign.sign(privateKey, "base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-
-  return `${unsignedToken}.${signature}`;
-}
-
-// Get installation access token (cached)
+// Get installation access token (for external use like image downloads)
 async function getInstallationToken(): Promise<string> {
-  // Return cached token if still valid (with 5 min buffer)
-  if (cachedToken && cachedToken.expiresAt > Date.now() + 5 * 60 * 1000) {
-    return cachedToken.token;
-  }
-
-  if (!GITHUB_APP_INSTALLATION_ID) {
-    throw new Error("Missing GITHUB_APP_INSTALLATION_ID");
-  }
-
-  const jwt = generateJWT();
-  console.log("Generated JWT (first 50 chars):", jwt.substring(0, 50));
-  console.log("App ID:", GITHUB_APP_ID);
-  console.log("Installation ID:", GITHUB_APP_INSTALLATION_ID);
-
-  // First, verify the JWT by calling /app endpoint
-  const appRes = await fetch("https://api.github.com/app", {
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      Accept: "application/vnd.github.v3+json",
-    },
-  });
-  const appData = await appRes.text();
-  console.log("GET /app response:", appRes.status, appData.substring(0, 200));
-
-  const res = await fetch(
-    `https://api.github.com/app/installations/${GITHUB_APP_INSTALLATION_ID}/access_tokens`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${jwt}`,
-        Accept: "application/vnd.github.v3+json",
-      },
-    }
-  );
-
-  if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`Failed to get installation token: ${error}`);
-  }
-
-  const data = await res.json();
-
-  // Cache the token
-  cachedToken = {
-    token: data.token,
-    expiresAt: new Date(data.expires_at).getTime(),
-  };
-
-  return data.token;
+  const octokit = getOctokit();
+  const auth = await octokit.auth({ type: "installation" }) as { token: string };
+  return auth.token;
 }
 
-// GitHub API helper (uses App installation token)
-export async function github(path: string, options?: RequestInit) {
-  const token = await getInstallationToken();
+// =============================================================================
+// TYPED GITHUB API FUNCTIONS (using Octokit)
+// =============================================================================
 
-  const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github.v3+json",
-      ...options?.headers,
-    },
+// List open PRs - returns Octokit's native type
+export async function getOpenPRs(): Promise<GitHubPullRequest[]> {
+  const octokit = getOctokit();
+  const { data } = await octokit.rest.pulls.list({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    state: "open",
   });
-  return res.json();
-}
-
-// GitHub API helper for any repo (for working with forks)
-async function githubRepo(owner: string, repo: string, path: string, options?: RequestInit) {
-  const token = await getInstallationToken();
-
-  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github.v3+json",
-      ...options?.headers,
-    },
-  });
-  return res.json();
-}
-
-export async function getOpenPRs() {
-  return github("/pulls?state=open");
+  return data;
 }
 
 // Get PR head branch information (needed for pushing to the PR branch)
@@ -575,10 +523,15 @@ export interface PRBranchInfo {
 }
 
 export async function getPRBranchInfo(prNumber: number): Promise<PRBranchInfo> {
-  const pr = await github(`/pulls/${prNumber}`);
+  const octokit = getOctokit();
+  const { data: pr } = await octokit.rest.pulls.get({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    pull_number: prNumber,
+  });
   return {
-    owner: pr.head.repo.owner.login,
-    repo: pr.head.repo.name,
+    owner: pr.head.repo?.owner.login || REPO_OWNER,
+    repo: pr.head.repo?.name || REPO_NAME,
     branch: pr.head.ref,
     sha: pr.head.sha,
   };
@@ -586,9 +539,19 @@ export async function getPRBranchInfo(prNumber: number): Promise<PRBranchInfo> {
 
 // Get file SHA from a branch (needed for updating existing files)
 async function getFileSHA(owner: string, repo: string, path: string, branch: string): Promise<string | null> {
+  const octokit = getOctokit();
   try {
-    const result = await githubRepo(owner, repo, `/contents/${path}?ref=${branch}`);
-    return result.sha || null;
+    const { data } = await octokit.rest.repos.getContent({
+      owner,
+      repo,
+      path,
+      ref: branch,
+    });
+    // getContent returns an object with sha when it's a file
+    if (!Array.isArray(data) && "sha" in data) {
+      return data.sha;
+    }
+    return null;
   } catch {
     return null; // File doesn't exist
   }
@@ -605,13 +568,12 @@ export async function pushFixesToPR(
 
   try {
     const branchInfo = await getPRBranchInfo(prNumber);
+    const octokit = getOctokit();
 
     // SAFETY: Never allow pushing to main/master
     if (branchInfo.branch === "main" || branchInfo.branch === "master") {
       throw new Error("SAFETY: Cannot push directly to main/master branch");
     }
-
-    const token = await getInstallationToken();
 
     // Push each file as a separate commit (simpler than creating a tree)
     let lastCommitUrl = "";
@@ -624,63 +586,31 @@ export async function pushFixesToPR(
       if (file.content === null || file.content === undefined || file.content === "") {
         if (fileSHA) {
           // File exists, delete it
-          const res = await fetch(
-            `https://api.github.com/repos/${branchInfo.owner}/${branchInfo.repo}/contents/${file.filename}`,
-            {
-              method: "DELETE",
-              headers: {
-                Authorization: `Bearer ${token}`,
-                Accept: "application/vnd.github.v3+json",
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                message: `fix: Remove ${file.filename} by PunkModBot\n\n🤖 Removed duplicate/unnecessary file`,
-                sha: fileSHA,
-                branch: branchInfo.branch,
-              }),
-            }
-          );
-
-          if (!res.ok) {
-            const error = await res.text();
-            console.error(`Failed to delete ${file.filename}:`, error);
-            return { success: false, error: `Failed to delete ${file.filename}: ${error}` };
-          }
-
-          const result = await res.json();
-          lastCommitUrl = result.commit?.html_url || "";
+          const result = await octokit.rest.repos.deleteFile({
+            owner: branchInfo.owner,
+            repo: branchInfo.repo,
+            path: file.filename,
+            message: `fix: Remove ${file.filename} by PunkModBot\n\n🤖 Removed duplicate/unnecessary file`,
+            sha: fileSHA,
+            branch: branchInfo.branch,
+          });
+          lastCommitUrl = result.data.commit?.html_url || "";
         }
         // If file doesn't exist and content is null, nothing to do
         continue;
       }
 
       // Create or update the file
-      const res = await fetch(
-        `https://api.github.com/repos/${branchInfo.owner}/${branchInfo.repo}/contents/${file.filename}`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/vnd.github.v3+json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            message: `fix: Auto-fix by PunkModBot\n\n🤖 Applied formatting fixes to ${file.filename}`,
-            content: Buffer.from(file.content).toString("base64"),
-            branch: branchInfo.branch,
-            ...(fileSHA ? { sha: fileSHA } : {}),
-          }),
-        }
-      );
-
-      if (!res.ok) {
-        const error = await res.text();
-        console.error(`Failed to push ${file.filename}:`, error);
-        return { success: false, error: `Failed to update ${file.filename}: ${error}` };
-      }
-
-      const result = await res.json();
-      lastCommitUrl = result.commit?.html_url || "";
+      const result = await octokit.rest.repos.createOrUpdateFileContents({
+        owner: branchInfo.owner,
+        repo: branchInfo.repo,
+        path: file.filename,
+        message: `fix: Auto-fix by PunkModBot\n\n🤖 Applied formatting fixes to ${file.filename}`,
+        content: Buffer.from(file.content).toString("base64"),
+        branch: branchInfo.branch,
+        ...(fileSHA ? { sha: fileSHA } : {}),
+      });
+      lastCommitUrl = result.data.commit?.html_url || "";
     }
 
     return { success: true, commitUrl: lastCommitUrl };
@@ -691,28 +621,20 @@ export async function pushFixesToPR(
 }
 
 export async function getPRComments(prNumber: number): Promise<GitHubComment[]> {
-  return github(`/issues/${prNumber}/comments`);
+  const octokit = getOctokit();
+  const { data } = await octokit.rest.issues.listComments({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    issue_number: prNumber,
+  });
+  return data.map(toGitHubComment);
 }
 
 // GraphQL helper for GitHub API (required for Discussions)
 async function githubGraphQL<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
-  const token = await getInstallationToken();
-
-  const res = await fetch("https://api.github.com/graphql", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-
-  const json = await res.json();
-  if (json.errors) {
-    console.error("GraphQL errors:", json.errors);
-    throw new Error(json.errors[0]?.message || "GraphQL error");
-  }
-  return json.data;
+  const octokit = getOctokit();
+  const data = await octokit.graphql<T>(query, variables);
+  return data;
 }
 
 // Extended comment type that tracks parent for nested replies
@@ -858,78 +780,33 @@ export async function postDiscussionComment(
 
 // Get the SHA of the main branch (needed to create a new branch)
 async function getMainBranchSHA(): Promise<string> {
-  const result = await github("/git/ref/heads/main");
-  return result.object.sha;
+  const octokit = getOctokit();
+  const { data } = await octokit.rest.git.getRef({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    ref: "heads/main",
+  });
+  return data.object.sha;
 }
 
 // Create a new branch from main
 async function createBranch(branchName: string): Promise<void> {
   const mainSHA = await getMainBranchSHA();
-  const token = await getInstallationToken();
+  const octokit = getOctokit();
 
-  const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/refs`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  try {
+    await octokit.rest.git.createRef({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
       ref: `refs/heads/${branchName}`,
       sha: mainSHA,
-    }),
-  });
-
-  if (!res.ok) {
-    const error = await res.text();
+    });
+  } catch (error) {
     // Branch might already exist, that's ok
-    if (!error.includes("Reference already exists")) {
-      throw new Error(`Failed to create branch: ${error}`);
+    if (error instanceof Error && !error.message.includes("Reference already exists")) {
+      throw new Error(`Failed to create branch: ${error.message}`);
     }
   }
-}
-
-// Delete a file on a branch (NOT on main - safety check built in)
-async function deleteFileOnBranch(
-  branchName: string,
-  filename: string,
-  commitMessage: string
-): Promise<{ success: boolean; error?: string }> {
-  // SAFETY: Never allow pushing to main
-  if (branchName === "main" || branchName === "master") {
-    throw new Error("SAFETY: Cannot push directly to main/master branch");
-  }
-
-  const token = await getInstallationToken();
-
-  // Get file SHA (required for deletion)
-  const existingSHA = await getFileSHA(REPO_OWNER, REPO_NAME, filename, branchName);
-  if (!existingSHA) {
-    // File doesn't exist, nothing to delete
-    return { success: true };
-  }
-
-  const res = await fetch(
-    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${filename}`,
-    {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message: commitMessage,
-        sha: existingSHA,
-        branch: branchName,
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    const error = await res.text();
-    return { success: false, error };
-  }
-
-  return { success: true };
 }
 
 // Create or update a file on a branch (NOT on main - safety check built in)
@@ -949,35 +826,22 @@ async function createFileOnBranch(
     throw new Error(`Invalid content for file ${filename}: content is null/undefined`);
   }
 
-  const token = await getInstallationToken();
+  const octokit = getOctokit();
 
   // Check if file already exists (need SHA to update)
   const existingSHA = await getFileSHA(REPO_OWNER, REPO_NAME, filename, branchName);
 
-  const res = await fetch(
-    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${filename}`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message: commitMessage,
-        content: Buffer.from(content).toString("base64"),
-        branch: branchName,
-        ...(existingSHA ? { sha: existingSHA } : {}),
-      }),
-    }
-  );
+  const result = await octokit.rest.repos.createOrUpdateFileContents({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    path: filename,
+    message: commitMessage,
+    content: Buffer.from(content).toString("base64"),
+    branch: branchName,
+    ...(existingSHA ? { sha: existingSHA } : {}),
+  });
 
-  if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`Failed to create file: ${error}`);
-  }
-
-  const result = await res.json();
-  return { commitUrl: result.commit?.html_url || "" };
+  return { commitUrl: result.data.commit?.html_url || "" };
 }
 
 // Create a new PR
@@ -986,29 +850,18 @@ async function createPR(
   title: string,
   body: string
 ): Promise<{ prNumber: number; prUrl: string }> {
-  const token = await getInstallationToken();
+  const octokit = getOctokit();
 
-  const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      title,
-      body,
-      head: branchName,
-      base: "main",
-    }),
+  const result = await octokit.rest.pulls.create({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    title,
+    body,
+    head: branchName,
+    base: "main",
   });
 
-  if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`Failed to create PR: ${error}`);
-  }
-
-  const result = await res.json();
-  return { prNumber: result.number, prUrl: result.html_url };
+  return { prNumber: result.data.number, prUrl: result.data.html_url };
 }
 
 // Find an existing open PR created by the bot for a specific discussion
@@ -1386,38 +1239,29 @@ async function addImageToBranch(
     throw new Error("SAFETY: Cannot push directly to main/master branch");
   }
 
-  const token = await getInstallationToken();
+  const octokit = getOctokit();
 
   // Check if file already exists
   const existingSHA = await getFileSHA(REPO_OWNER, REPO_NAME, imagePath, branchName);
   console.log(`[addImageToBranch] Existing SHA: ${existingSHA || "(new file)"}`);
 
   console.log(`[addImageToBranch] Committing to GitHub...`);
-  const res = await fetch(
-    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${imagePath}`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message: commitMessage,
-        content: imageBase64,
-        branch: branchName,
-        ...(existingSHA ? { sha: existingSHA } : {}),
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    const error = await res.text();
-    console.error(`[addImageToBranch] GitHub API error: ${error}`);
-    return { success: false, error };
+  try {
+    await octokit.rest.repos.createOrUpdateFileContents({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: imagePath,
+      message: commitMessage,
+      content: imageBase64,
+      branch: branchName,
+      ...(existingSHA ? { sha: existingSHA } : {}),
+    });
+    console.log(`[addImageToBranch] Success! Image committed to ${imagePath}`);
+    return { success: true };
+  } catch (error) {
+    console.error(`[addImageToBranch] GitHub API error:`, error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
-
-  console.log(`[addImageToBranch] Success! Image committed to ${imagePath}`);
-  return { success: true };
 }
 
 // Fetch and add an image to a PR (from URL - either uploaded image or OG image)
@@ -1457,32 +1301,64 @@ export async function addImageToPR(
 }
 
 export async function getPRFiles(prNumber: number): Promise<PRFile[]> {
-  const token = await getInstallationToken();
-  const files = await github(`/pulls/${prNumber}/files`);
+  const octokit = getOctokit();
+  const { data: files } = await octokit.rest.pulls.listFiles({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    pull_number: prNumber,
+  });
   const result: PRFile[] = [];
+
+  // Get PR branch info to fetch file contents from the correct ref
+  const branchInfo = await getPRBranchInfo(prNumber);
 
   for (const file of files) {
     const isContentFile = file.filename.startsWith("content/punks/") || file.filename.startsWith("content/projects/");
 
     if (isContentFile && file.filename.endsWith(".md") && file.status !== "removed") {
-      const res = await fetch(file.raw_url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      result.push({ filename: file.filename, status: file.status, contents: await res.text() });
+      try {
+        const { data: contentData } = await octokit.rest.repos.getContent({
+          owner: branchInfo.owner,
+          repo: branchInfo.repo,
+          path: file.filename,
+          ref: branchInfo.branch,
+        });
+
+        // Content is base64 encoded when it's a file (not a directory)
+        if ("content" in contentData && contentData.type === "file") {
+          const contents = Buffer.from(contentData.content, "base64").toString("utf-8");
+          result.push({ filename: file.filename, status: file.status, contents });
+        }
+      } catch (error) {
+        console.error(`Failed to fetch contents for ${file.filename}:`, error);
+      }
     }
   }
   return result;
 }
 
 export async function getPRDetails(prNumber: number): Promise<PRDetails> {
-  return github(`/pulls/${prNumber}`);
+  const octokit = getOctokit();
+  const { data } = await octokit.rest.pulls.get({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    pull_number: prNumber,
+  });
+  return {
+    number: data.number,
+    title: data.title,
+    body: data.body,
+    user: { login: data.user?.login || "unknown" },
+  };
 }
 
-export async function postComment(prNumber: number, body: string) {
-  return github(`/issues/${prNumber}/comments`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ body }),
+export async function postComment(prNumber: number, body: string): Promise<void> {
+  const octokit = getOctokit();
+  await octokit.rest.issues.createComment({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    issue_number: prNumber,
+    body,
   });
 }
 
@@ -2064,14 +1940,14 @@ export function verifyWebhookSignature(payload: string, signature: string | null
 // ISSUE HANDLING FUNCTIONS
 // =============================================================================
 
-export interface IssueDetails {
-  number: number;
-  title: string;
+// IssueDetails - derived from Octokit type
+export type IssueDetails = Pick<GitHubIssue, "number" | "title"> & {
   body: string | null;
   user: { login: string };
   labels: { name: string }[];
-}
+};
 
+// IssueComment - simplified view for our use case
 interface IssueComment {
   id: number;
   body: string;
@@ -2080,20 +1956,46 @@ interface IssueComment {
 
 // Get issue details
 export async function getIssueDetails(issueNumber: number): Promise<IssueDetails> {
-  return github(`/issues/${issueNumber}`);
+  const octokit = getOctokit();
+  const { data } = await octokit.rest.issues.get({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    issue_number: issueNumber,
+  });
+  return {
+    number: data.number,
+    title: data.title,
+    body: data.body ?? null,
+    user: { login: data.user?.login || "unknown" },
+    labels: data.labels.map(label => ({
+      name: typeof label === "string" ? label : label.name || "",
+    })),
+  };
 }
 
 // Get issue comments (same API as PR comments)
 export async function getIssueComments(issueNumber: number): Promise<IssueComment[]> {
-  return github(`/issues/${issueNumber}/comments`);
+  const octokit = getOctokit();
+  const { data } = await octokit.rest.issues.listComments({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    issue_number: issueNumber,
+  });
+  return data.map(comment => ({
+    id: comment.id,
+    body: comment.body || "",
+    user: { login: comment.user?.login || "unknown" },
+  }));
 }
 
 // Post a comment on an issue
 export async function postIssueComment(issueNumber: number, body: string): Promise<void> {
-  await github(`/issues/${issueNumber}/comments`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ body }),
+  const octokit = getOctokit();
+  await octokit.rest.issues.createComment({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    issue_number: issueNumber,
+    body,
   });
 }
 
@@ -2453,9 +2355,12 @@ PR #${prNumber} was just merged. Thanks for contributing to Made by Punks! ✨`;
 
     // Close the issue
     try {
-      await github(`repos/${REPO_OWNER}/${REPO_NAME}/issues/${issueNumber}`, {
-        method: "PATCH",
-        body: JSON.stringify({ state: "closed" }),
+      const octokit = getOctokit();
+      await octokit.rest.issues.update({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        issue_number: issueNumber,
+        state: "closed",
       });
       return { notified: true, target: `issue #${issueNumber}`, closed: true };
     } catch (error) {
