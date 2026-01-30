@@ -74,11 +74,12 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
             <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
               {/* Thumbnail */}
-              <div className="relative aspect-video w-full max-w-md overflow-hidden bg-punk-blue-light lg:w-96 pixel-shadow">
+              <div className="w-full max-w-md lg:w-96 pixel-shadow overflow-hidden bg-punk-blue-light">
                 <ProjectThumbnail
                   projectUrl={project.url}
                   projectName={project.name}
                   thumbnail={project.thumbnail}
+                  mode="contain"
                 />
               </div>
 

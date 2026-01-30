@@ -6,10 +6,12 @@ import { BrokenImageIcon } from "./icons";
 
 interface SafeImageProps extends Omit<ImageProps, "onError"> {
   fallbackText?: string;
+  fallbackMode?: "fill" | "aspect";
 }
 
 export function SafeImage({
   fallbackText,
+  fallbackMode = "aspect",
   alt,
   className,
   ...props
@@ -17,8 +19,12 @@ export function SafeImage({
   const [hasError, setHasError] = useState(false);
 
   if (hasError) {
+    const containerClass = fallbackMode === "fill"
+      ? "absolute inset-0 flex items-center justify-center bg-punk-blue-light"
+      : "aspect-video flex items-center justify-center bg-punk-blue-light";
+
     return (
-      <div className="absolute inset-0 flex items-center justify-center bg-punk-blue-light">
+      <div className={containerClass}>
         <div className="flex flex-col items-center gap-2 text-white opacity-60">
           <BrokenImageIcon className="h-8 w-8" />
           {fallbackText && (

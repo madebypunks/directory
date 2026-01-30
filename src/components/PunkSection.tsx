@@ -23,7 +23,7 @@ export function PunkSection({ punks, projects, isFirst = false }: PunkSectionPro
                   href={`/${punk.id}`}
                   className="group flex items-center gap-2 hover:opacity-80 transition-opacity"
                 >
-                  <PunkAvatar punkId={punk.id} size={32} />
+                  <PunkAvatar punkId={punk.id} size={40} />
                   <div className="flex flex-col">
                     <span className="font-bold uppercase tracking-wide group-hover:text-punk-pink transition-colors">
                       {punk.name || `Punk`}
