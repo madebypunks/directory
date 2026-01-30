@@ -407,6 +407,12 @@ export async function pushFixesToPR(
 
   try {
     const branchInfo = await getPRBranchInfo(prNumber);
+
+    // SAFETY: Never allow pushing to main/master
+    if (branchInfo.branch === "main" || branchInfo.branch === "master") {
+      throw new Error("SAFETY: Cannot push directly to main/master branch");
+    }
+
     const token = await getInstallationToken();
 
     // Push each file as a separate commit (simpler than creating a tree)
