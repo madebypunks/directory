@@ -4,6 +4,7 @@ import Link from "next/link";
 import Markdown from "react-markdown";
 import { Header, Footer, PunkAvatar, ProjectThumbnail, Button, LinksList, BackButton, CTASection } from "@/components";
 import { getProjectById, getAllProjects, getProjectCreators } from "@/data/punks";
+import { generateProjectEditUrl } from "@/lib/github";
 
 interface ProjectPageProps {
   params: Promise<{ slug: string }>;
@@ -152,6 +153,11 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           title="Know more about this project?"
           description="Help us document the work of CryptoPunks holders. Anyone can contribute."
           buttonLabel="Contribute →"
+          href={generateProjectEditUrl({
+            projectId: project.id,
+            name: project.name,
+          })}
+          external
         />
       </main>
 

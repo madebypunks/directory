@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Markdown from "react-markdown";
 import { Header, Footer, PunkAvatar, ProjectListItem, LinksList, BackButton, CTASection } from "@/components";
 import { getPunkById, getAllPunks, getProjectsByPunk, getProjectCreators } from "@/data/punks";
+import { generatePunkEditUrl } from "@/lib/github";
 
 interface PunkPageProps {
   params: Promise<{ id: string }>;
@@ -153,6 +154,11 @@ export default async function PunkPage({ params }: PunkPageProps) {
           title="Know this punk?"
           description="Help us build the most complete directory of CryptoPunks holders. Anyone can contribute."
           buttonLabel="Contribute →"
+          href={generatePunkEditUrl({
+            punkId,
+            name: punk.name,
+          })}
+          external
         />
       </main>
 

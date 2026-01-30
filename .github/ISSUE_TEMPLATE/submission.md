@@ -1,7 +1,7 @@
 ---
-name: Work Submission
-about: Add your CryptoPunks-related work to the directory
-title: "New Work: [Your Work Name]"
+name: New Submission
+about: Add yourself or your work to the directory
+title: "New Submission"
 labels: submission
 assignees: ""
 ---
@@ -17,9 +17,14 @@ assignees: ""
 **Your Links (optional):**
 <!-- Any links you want on your profile: X/Twitter, website, etc. One per line -->
 
+**Bio (optional):**
+<!-- Tell us about yourself -->
+
 ---
 
-## Your Work
+## Your Work (Optional)
+
+<!-- Skip this section if you just want to add your profile -->
 
 **Name:**
 
@@ -34,18 +39,12 @@ assignees: ""
 **What type of work is it?**
 <!-- Pick all that apply: Art, Book, Film, Documentary, Music, Animation, Derivative, Generative, History, Guide, Creation, Memes, Fun, Community, Collector, etc. -->
 
----
-
-## Extras (Optional)
-
-**Links:**
+**Project Links (optional):**
 <!-- Any related links: X/Twitter, GitHub, Discord, etc. One per line -->
 
-**Thumbnail Image:**
+**Thumbnail Image (optional):**
 <!-- You can drag and drop an image here, or paste a link -->
-
-**Anything else you want to share?**
 
 ---
 
-*A maintainer will add your work to the directory. Thanks for contributing!*
+*PunkMod will help process your submission and create a pull request.*
