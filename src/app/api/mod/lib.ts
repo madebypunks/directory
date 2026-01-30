@@ -1,6 +1,86 @@
 import Anthropic from "@anthropic-ai/sdk";
 import crypto from "crypto";
 
+// Helper to parse JSON from Claude's response, handling common issues
+function parseClaudeJSON<T>(text: string): T {
+  // Extract JSON from the response
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("No JSON in response");
+
+  let jsonStr = match[0];
+
+  // Try parsing as-is first
+  try {
+    return JSON.parse(jsonStr);
+  } catch (e) {
+    // If parsing fails, try to fix common issues
+    console.log("[parseClaudeJSON] Initial parse failed, attempting repair...");
+
+    // Fix unescaped newlines in string values
+    // This regex finds strings and escapes any literal newlines inside them
+    jsonStr = jsonStr.replace(/"([^"\\]|\\.)*"/g, (match) => {
+      return match
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "\\r")
+        .replace(/\t/g, "\\t");
+    });
+
+    try {
+      return JSON.parse(jsonStr);
+    } catch (e2) {
+      // If still failing, try a more aggressive approach:
+      // Find the last valid closing brace
+      let depth = 0;
+      let lastValidEnd = -1;
+      let inString = false;
+      let escape = false;
+
+      for (let i = 0; i < jsonStr.length; i++) {
+        const char = jsonStr[i];
+
+        if (escape) {
+          escape = false;
+          continue;
+        }
+
+        if (char === "\\") {
+          escape = true;
+          continue;
+        }
+
+        if (char === '"' && !escape) {
+          inString = !inString;
+          continue;
+        }
+
+        if (!inString) {
+          if (char === "{") depth++;
+          if (char === "}") {
+            depth--;
+            if (depth === 0) {
+              lastValidEnd = i;
+            }
+          }
+        }
+      }
+
+      if (lastValidEnd > 0) {
+        jsonStr = jsonStr.substring(0, lastValidEnd + 1);
+        try {
+          return JSON.parse(jsonStr);
+        } catch (e3) {
+          // Last resort: log and throw
+          console.error("[parseClaudeJSON] All repair attempts failed");
+          console.error("[parseClaudeJSON] JSON snippet:", jsonStr.substring(0, 500));
+          throw new Error(`Failed to parse Claude JSON: ${e3}`);
+        }
+      }
+
+      throw new Error(`Failed to parse Claude JSON: ${e2}`);
+    }
+  }
+}
+
 // GitHub App config
 const GITHUB_APP_ID = process.env.GITHUB_APP_ID;
 const GITHUB_APP_INSTALLATION_ID = process.env.GITHUB_APP_INSTALLATION_ID;
@@ -1506,9 +1586,7 @@ RULES:
 
   const text = response.content[0];
   if (text.type !== "text") throw new Error("Unexpected response");
-  const match = text.text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error("No JSON in response");
-  return JSON.parse(match[0]);
+  return parseClaudeJSON(text.text);
 }
 
 function getStatusBadge(status: ReviewStatus): string {
@@ -1774,9 +1852,7 @@ If the discussion is spam, off-topic garbage, or you genuinely have nothing usef
 
   const text = response.content[0];
   if (text.type !== "text") throw new Error("Unexpected response");
-  const match = text.text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error("No JSON in response");
-  return JSON.parse(match[0]);
+  return parseClaudeJSON(text.text);
 }
 
 // Handle a discussion event (new discussion or new comment)
@@ -2156,9 +2232,7 @@ For spam or off-topic:
 
   const text = response.content[0];
   if (text.type !== "text") throw new Error("Unexpected response");
-  const match = text.text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error("No JSON in response");
-  return JSON.parse(match[0]);
+  return parseClaudeJSON(text.text);
 }
 
 // Handle an issue event (new issue or new comment)
