@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Markdown from "react-markdown";
-import { Header, Footer, PunkAvatar, ProjectListItem, LinksList, BackButton } from "@/components";
+import { Header, Footer, PunkAvatar, ProjectListItem, LinksList, BackButton, CTASection } from "@/components";
 import { getPunkById, getAllPunks, getProjectsByPunk, getProjectCreators } from "@/data/punks";
 
 interface PunkPageProps {
@@ -72,9 +72,10 @@ export default async function PunkPage({ params }: PunkPageProps) {
     <div className="flex min-h-screen flex-col">
       <Header />
 
-      <main className="flex-1">
-        {/* Punk Header */}
-        <section className="bg-punk-blue">
+      <main className="flex-1 flex flex-col">
+        <div className="flex-1">
+          {/* Punk Header */}
+          <section className="bg-punk-blue">
           <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
             <BackButton className="mb-6" />
 
@@ -146,6 +147,13 @@ export default async function PunkPage({ params }: PunkPageProps) {
             </div>
           </section>
         )}
+        </div>
+
+        <CTASection
+          title="Know this punk?"
+          description="Help us build the most complete directory of CryptoPunks holders. Anyone can contribute."
+          buttonLabel="Contribute →"
+        />
       </main>
 
       <Footer />
