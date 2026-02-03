@@ -108,7 +108,7 @@ Then open a pull request.
 
 ## PunkMod - Your AI Assistant
 
-<img src="https://punks.art/api/traits/003-055-020-052?background=v2&format=png&size=24" alt="PunkMod" width="96" height="96" style="image-rendering: pixelated;" />
+<img src="https://punks.art/api/traits/003-055-020-052?background=v2&format=png&size=240" alt="PunkMod" width="96" height="96" />
 
 When you open a pull request or start a discussion, **PunkMod** will help you:
 
