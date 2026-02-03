@@ -3,7 +3,7 @@ name: CryptoPunks
 description: The original marketplace for the 10,000 unique 24x24 pixel art characters that started the NFT revolution.
 url: https://cryptopunks.app/
 launchDate: 2017-06-23
-thumbnail: /projects/cryptopunks.webp
+thumbnail: /projects/cryptopunks.png
 tags:
   - Marketplace
   - Explorer
