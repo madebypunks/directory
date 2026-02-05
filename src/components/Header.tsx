@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { HiUsers } from "react-icons/hi";
 import { SITE_NAME } from "@/lib/constants";
-import { Button } from "./Button";
 import { SearchOverlay } from "./SearchOverlay";
 import { getSearchData } from "@/data/punks";
 import { AuthButton } from "./auth";
+import { AddLink } from "./AddLink";
 
 export function Header() {
   const searchItems = getSearchData();
@@ -27,6 +27,7 @@ export function Header() {
           >
             <HiUsers className="w-5 h-5" />
           </Link>
+          <AddLink />
           <div className="ml-2">
             <AuthButton />
           </div>

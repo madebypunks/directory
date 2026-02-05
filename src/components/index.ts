@@ -1,4 +1,5 @@
 export { Header } from "./Header";
+export { AddLink } from "./AddLink";
 export { Footer } from "./Footer";
 export { PunkAvatar } from "./PunkAvatar";
 export { PunkBadge } from "./PunkBadge";
