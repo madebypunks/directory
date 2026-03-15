@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllProjects, getProjectsByTag, getProjectsByPunk, getAllTags } from "@/data/punks";
+import { getAllProjects, getAllTags } from "@/data/punks";
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,7 +13,10 @@ export async function GET(request: NextRequest) {
     let projects = getAllProjects();
 
     if (tag) {
-      projects = getProjectsByTag(tag);
+      const tagLower = tag.toLowerCase();
+      projects = projects.filter((p) =>
+        p.tags.some((t) => t.toLowerCase() === tagLower)
+      );
     }
 
     if (creator) {
