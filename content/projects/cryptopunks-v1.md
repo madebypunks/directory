@@ -3,17 +3,19 @@ name: CryptoPunks V1
 description: >-
   The original CryptoPunks from the initial 2017 smart contract, wrapped as
   ERC-721 tokens. A controversial piece of punk history.
-url: https://v1punks.io/
-launchDate: 2021-01-01
+url: https://v1cryptopunks.com/
+launchDate: 2022-01-17
 tags:
   - History
-  - Derivative
+  - Controversial
   - Community
 links:
   - https://x.com/frankNFT_eth
-  - https://opensea.io/collection/v1-cryptopunks-wrapped
+  - https://opensea.io/collection/official-v1-punks
+  - https://frankponcelet.com/blog/cryptopunks-v1-wrapper
 creators:
-  - 8274
+  - 4706
+thumbnail: /projects/cryptopunks-v1.png
 ---
 
 CryptoPunks V1 refers to the original smart contract released by Larva Labs on June 9, 2017. A critical bug was discovered after all 10,000 tokens were claimed, leading Larva Labs to create V2 on June 23, 2017, and airdrop new tokens to original claimants.
